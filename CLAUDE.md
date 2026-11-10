@@ -25,6 +25,12 @@
 - 모듈: `core`(도메인·서비스·경계 인터페이스), `storage`(DB 구현), `external`(외부 연동 구현), `api`(진입점, 실행 모듈)
 - 버전은 `gradle/libs.versions.toml`에서, 라이브러리 버전은 Spring Boot BOM에서 관리한다. 모듈의 `build.gradle.kts`에는 버전을 적지 않는다.
 
+## 코드 스타일
+
+- 스타일 규칙의 원본은 `.editorconfig`다. ktlint가 이 파일을 읽어 검사한다.
+- `./gradlew build`에 포맷 검사(`ktlintCheck`)가 포함된다. 위반은 `./gradlew ktlintFormat`으로 자동 수정한 뒤 커밋한다.
+- 코드를 작성하거나 고친 뒤에는 `./gradlew ktlintFormat`을 실행한다.
+
 ## 작업 규칙
 
 - **범위**: 이슈에 적힌 범위만 작업한다. 다음 이슈에서 필요할 것 같은 코드를 미리 만들지 않는다.

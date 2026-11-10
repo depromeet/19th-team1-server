@@ -1,0 +1,21 @@
+# 에디터와 ktlint 가 함께 읽는 코드 스타일 설정. 스타일 규칙의 원본은 이 파일이다.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+# IntelliJ 의 Kotlin 기본 포맷과 같은 스타일. IDE 자동 정렬과 ktlint 검사가 서로 다른 결과를 내지 않게 한다.
+ktlint_code_style = intellij_idea
+max_line_length = 120
+
+[*.{yml,yaml,json}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

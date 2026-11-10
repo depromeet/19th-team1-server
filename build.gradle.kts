@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.spring) apply false
     alias(libs.plugins.spring.boot) apply false
+    alias(libs.plugins.ktlint) apply false
 }
 
 // 모든 모듈에 공통으로 적용하는 설정. 모듈별 의존성은 각 모듈의 build.gradle.kts 에 둔다.
@@ -14,6 +15,8 @@ subprojects {
 
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
+    // 포맷 검사. ./gradlew check(build) 에 포함되고, ./gradlew ktlintFormat 으로 자동 수정한다.
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
 
     extensions.configure<KotlinJvmProjectExtension> {
         jvmToolchain(25)

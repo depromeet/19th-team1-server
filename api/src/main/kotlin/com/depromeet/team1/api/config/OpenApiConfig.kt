@@ -9,11 +9,10 @@ import org.springframework.context.annotation.Configuration
 @Configuration(proxyBeanMethods = false)
 class OpenApiConfig {
     @Bean
-    fun openApi(): OpenAPI =
-        OpenAPI().info(
-            Info()
-                .title("team1-server API")
-                .description("디프만 19기 1팀 서버 API")
-                .version("v1"),
-        )
+    fun openApi(): OpenAPI = OpenAPI().info(
+        Info()
+            .title("team1-server API")
+            .description("디프만 19기 1팀 서버 API")
+            .version("v1"),
+    )
 }

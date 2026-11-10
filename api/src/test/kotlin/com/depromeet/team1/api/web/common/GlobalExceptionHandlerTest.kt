@@ -1,7 +1,7 @@
 package com.depromeet.team1.api.web.common
 
-import com.depromeet.team1.core.common.error.BusinessException
-import com.depromeet.team1.core.common.error.CommonErrorCode
+import com.depromeet.team1.core.common.error.AppException
+import com.depromeet.team1.core.common.error.CommonError
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
@@ -32,12 +32,12 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    fun `업무 예외는 에러 코드의 분류로 상태 코드를 정한다`() {
+    fun `AppException 은 에러 코드의 분류로 상태 코드를 정한다`() {
         mockMvc
             .perform(get("/sample/not-found"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
-            .andExpect(jsonPath("$.message").value(CommonErrorCode.RESOURCE_NOT_FOUND.message))
+            .andExpect(jsonPath("$.message").value(CommonError.RESOURCE_NOT_FOUND.message))
     }
 
     @Test
@@ -46,7 +46,7 @@ class GlobalExceptionHandlerTest {
             .perform(get("/sample/unexpected"))
             .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
-            .andExpect(jsonPath("$.message").value(CommonErrorCode.INTERNAL_ERROR.message))
+            .andExpect(jsonPath("$.message").value(CommonError.INTERNAL_ERROR.message))
     }
 
     @Test
@@ -62,7 +62,7 @@ class GlobalExceptionHandlerTest {
         mockMvc
             .perform(post("/sample/ok"))
             .andExpect(status().isMethodNotAllowed)
-            .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
+            .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
     }
 
     @Test
@@ -79,14 +79,12 @@ class GlobalExceptionHandlerTest {
         fun ok() = ApiResponse(mapOf("name" to "sample"))
 
         @GetMapping("/sample/not-found")
-        fun notFound(): ApiResponse<Unit> = throw BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND, "sample id=1")
+        fun notFound(): ApiResponse<Unit> = throw AppException(CommonError.RESOURCE_NOT_FOUND, "sample id=1")
 
         @GetMapping("/sample/unexpected")
         fun unexpected(): ApiResponse<Unit> = throw IllegalStateException("내부 상태 메시지")
 
         @PostMapping("/sample/body")
-        fun body(
-            @RequestBody body: Map<String, String>,
-        ) = ApiResponse(body)
+        fun body(@RequestBody body: Map<String, String>) = ApiResponse(body)
     }
 }

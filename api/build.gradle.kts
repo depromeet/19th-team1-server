@@ -14,6 +14,7 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-mysql")
+    testImplementation(libs.archunit)
 }
 
 // 실행 가능한 jar 하나만 만든다.

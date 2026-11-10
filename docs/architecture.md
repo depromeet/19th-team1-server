@@ -145,7 +145,15 @@ api         com.depromeet.team1.api    (실행 클래스 ApiApplication 만 com.
 - 요청·응답 DTO는 `api`에만 둔다. 서비스에는 도메인 값이나 명령 객체로 바꿔 넘긴다.
 - 기능 간에는 상대의 서비스를 호출하고, 엔티티를 직접 참조하지 않고 ID로 연결한다.
 
-모듈 간 의존은 컴파일러가 강제한다. 모듈 안의 규칙(도메인 모델에 프레임워크 어노테이션 금지 등)은 아키텍처 테스트로 검사한다.
+모듈 간 의존은 컴파일러가 강제한다. 모듈 안의 규칙은 아키텍처 테스트(`api/src/test/kotlin/com/depromeet/team1/architecture/ArchitectureTest.kt`)가 `./gradlew build`에서 검사한다.
+
+| 규칙 | 검사 |
+| --- | --- |
+| `core`에서 서비스가 아닌 클래스(도메인 모델, 경계 인터페이스)는 Spring에 의존하지 않는다 | 아키텍처 테스트 |
+| `core`의 서비스는 `@Service`로 등록한다 | 아키텍처 테스트 |
+| JPA 엔티티는 `storage`에 두고 이름을 `JpaEntity`로 끝낸다 | 아키텍처 테스트 |
+| 컨트롤러는 `api`의 `web` 패키지에 두고 이름을 `Controller`로 끝낸다 | 아키텍처 테스트 |
+| 기능 간에는 상대 서비스를 호출하고 ID로 연결한다 | 코드 리뷰 |
 
 ## 7. 도메인 모델
 

@@ -28,8 +28,9 @@
 ## 코드 스타일
 
 - 스타일 규칙의 원본은 `.editorconfig`다. ktlint가 이 파일을 읽어 검사한다.
-- `./gradlew build`에 포맷 검사(`ktlintCheck`)가 포함된다. 위반은 `./gradlew ktlintFormat`으로 자동 수정한 뒤 커밋한다.
-- 코드를 작성하거나 고친 뒤에는 `./gradlew ktlintFormat`을 실행한다.
+- 커밋할 때 git pre-commit 훅이 스테이지된 Kotlin 파일을 자동으로 포맷해 커밋에 포함한다. 훅은 로컬에서 처음 빌드할 때 자동으로 설치된다.
+- `./gradlew build`와 PR 검사에는 포맷 검사(`ktlintCheck`)가 포함된다. 훅을 건너뛴 커밋(`--no-verify`)은 여기서 걸린다.
+- 에이전트가 Gradle을 실행할 수 없는 환경에서 커밋했다면, 사람이 푸시하기 전에 `./gradlew ktlintFormat`을 실행하도록 알린다.
 
 ## 작업 규칙
 

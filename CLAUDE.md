@@ -13,6 +13,18 @@
 | [docs/architecture.md](docs/architecture.md) | 배포 구성, 모듈·패키지 구조, 도메인 모델, 확장 지점, 결정 기록 |
 | [docs/conventions.md](docs/conventions.md) | 브랜치·커밋·PR 규칙 |
 
+## 빌드·실행
+
+```bash
+./gradlew build                 # 전체 빌드 + 테스트
+./gradlew :api:bootRun          # 애플리케이션 실행
+./gradlew :core:test            # 모듈별 테스트
+./gradlew :core:test --tests "com.depromeet.team1.core.SomeTest"   # 테스트 클래스 하나
+```
+
+- 모듈: `core`(도메인·서비스·경계 인터페이스), `storage`(DB 구현), `external`(외부 연동 구현), `api`(진입점, 실행 모듈)
+- 버전은 `gradle/libs.versions.toml`에서, 라이브러리 버전은 Spring Boot BOM에서 관리한다. 모듈의 `build.gradle.kts`에는 버전을 적지 않는다.
+
 ## 작업 규칙
 
 - **범위**: 이슈에 적힌 범위만 작업한다. 다음 이슈에서 필요할 것 같은 코드를 미리 만들지 않는다.

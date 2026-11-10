@@ -45,7 +45,7 @@ docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
 
 ## 커밋·PR
 
-- 형식은 `docs/conventions.md`를 따른다.
+- 형식은 `docs/conventions.md`를 따른다. 규칙의 원본은 `scripts/check-convention.sh`이고, 커밋하기 전에 `scripts/check-convention.sh message "<메시지 첫 줄>"`로 확인할 수 있다.
 - 이슈 생성, 커밋, 푸시, PR 생성은 사람이 요청할 때만 한다. 커밋하기 전에 메시지를 보여 주고 확인을 받는다.
 - 에이전트가 작성한 커밋에는 `Co-Authored-By: Claude <noreply@anthropic.com>` 한 줄을 남긴다. 세션 링크나 세션 식별 정보는 남기지 않는다.
 

@@ -1,0 +1,35 @@
+name: Convention
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  convention:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      # PR 제목·브랜치 이름은 환경변수로 넘긴다. run 에 직접 넣으면 제목에 쓴 문자열이 명령으로 실행될 수 있다.
+      - name: PR 제목
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: scripts/check-convention.sh message "$TITLE"
+      - name: 브랜치 이름
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: scripts/check-convention.sh branch "$BRANCH"
+      - name: 커밋 메시지
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          fail=0
+          while IFS= read -r subject; do
+            scripts/check-convention.sh message "$subject" || fail=1
+          done < <(git log --format=%s "$BASE..$HEAD")
+          exit "$fail"

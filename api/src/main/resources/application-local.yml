@@ -1,0 +1,10 @@
+spring:
+  config:
+    # 레포 루트의 .env 를 읽는다. 실행 위치가 루트(./)이든 모듈 폴더(../)이든 찾을 수 있게 둘 다 적는다.
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../.env[.properties]
+
+logging:
+  level:
+    org.hibernate.SQL: debug

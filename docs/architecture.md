@@ -127,13 +127,12 @@ external    com.depromeet.team1.external
 ├── push/               푸시 발송 구현
 └── file/               파일 저장소 구현
 
-api         com.depromeet.team1.api
+api         com.depromeet.team1.api    (실행 클래스 ApiApplication 만 com.depromeet.team1 에 둔다)
 ├── web/<feature>/      컨트롤러, 요청·응답 DTO
 ├── web/common/         응답 포맷, 예외 변환, 현재 사용자 해석
 ├── scheduler/          정해진 시각에 도는 작업
 ├── worker/             작업 테이블 폴링
 ├── config/             Swagger 등 설정
-└── ApiApplication.kt   실행 클래스 (com.depromeet.team1 전체를 스캔)
 ```
 
 **규칙**
@@ -278,17 +277,7 @@ sequenceDiagram
   - 변환은 `api`의 `@RestControllerAdvice` 한 곳에서 한다.
 - **스키마 관리**: Flyway. 애플리케이션은 스키마를 만들지 않는다(`ddl-auto: validate`).
 - **시간**: UTC 저장, 응답은 ISO-8601
-- **프로필**: `local` / `dev` / `prod`
-- **환경변수** (이름만. 값은 `.env`에 두고 커밋하지 않는다)
-
-  | 이름 | 용도 |
-  | --- | --- |
-  | `SPRING_PROFILES_ACTIVE` | 프로필 |
-  | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | MySQL 접속 |
-  | `LLM_API_KEY` | LLM 팀 공용 키 |
-  | `LLM_LIMIT_PER_IMPORT`, `LLM_DAILY_LIMIT_PER_USER`, `LLM_DAILY_LIMIT_TOTAL` | 사용량 상한 |
-  | `WORKER_ENABLED`, `SCHEDULER_ENABLED`, `WORKER_CONCURRENCY` | 역할 켜고 끄기, 동시 처리 수 |
-  | (인증 확정 후 추가) | 토큰 서명 키 등 |
+- **프로필과 환경변수**: `local` / `dev` / `prod`. 목록과 주입 방법은 [docs/deployment.md](deployment.md)에 둔다. 값은 코드·설정·문서에 넣지 않는다.
 
 ## 10. 결정 기록
 
@@ -307,6 +296,7 @@ sequenceDiagram
 | JDK 25 + Spring Boot 4.1 + Kotlin 2.3 + Gradle 9 | 시작 시점의 최신 LTS JDK와 최신 안정 버전이다. Kotlin은 2.3부터 JDK 25를 지원한다. 서버는 컨테이너로 실행하므로 JDK 버전이 클라우드 선택에 영향을 주지 않는다 |
 | 기본 패키지는 `com.depromeet.team1` | 패키지명은 바꾸는 비용이 크다. 서비스명과 무관한 이름으로 고정하고, 서비스명은 문서 제목과 애플리케이션 이름에만 쓴다 |
 | 실행 모듈 이름은 `api` | 배포 단위는 주된 역할로 이름 짓는다. 분리 시 `worker`를 옆에 추가한다 |
+| 로컬 DB는 Docker Compose, 테스트 DB는 Testcontainers | 로컬과 테스트 모두 운영과 같은 MySQL로 돌려, H2 같은 대체 DB와의 문법 차이를 없앤다 |
 | 비동기 처리는 DB 작업 테이블 + 워커 | 추가 인프라 없이 재시도·복구가 가능하다. 메시지 큐는 `JobQueue` 뒤에서 교체한다 |
 | 가져오기 묶음과 예약 알림을 공통 뼈대에 포함 | 두 방향 모두 첫 진입에서 수백 건을 한 번에 가져오고, 정해진 시각에 알림을 보낸다 |
 

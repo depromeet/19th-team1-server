@@ -1,0 +1,7 @@
+# 운영 서버 전용 설정. 공통 설정은 application.yml 에 있다.
+springdoc:
+  # 공개 서버에 API 문서를 노출하지 않는다.
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

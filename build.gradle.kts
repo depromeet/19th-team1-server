@@ -9,9 +9,16 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-// 커밋할 때 스테이지된 Kotlin 파일을 자동으로 포맷하는 git pre-commit 훅을, 로컬에서 처음 빌드할 때 설치한다.
-// CI 와 .git 이 없는 곳(Docker 빌드 등)에서는 설치하지 않는다.
+// git 훅을 로컬에서 처음 빌드할 때 설치한다. CI 와 .git 이 없는 곳(Docker 빌드 등)에서는 설치하지 않는다.
+//   - pre-commit: 스테이지된 Kotlin 파일을 자동으로 포맷한다 (ktlint 플러그인 제공)
+//   - commit-msg: 커밋 메시지 규칙을 검사하고 브랜치의 이슈 번호를 붙인다 (scripts/git-hooks/commit-msg)
 val installGitHook = rootProject.file(".git").isDirectory && System.getenv("CI") == null
+
+val installCommitMsgHook by tasks.registering(Copy::class) {
+    from("scripts/git-hooks/commit-msg")
+    into(".git/hooks")
+    filePermissions { unix("rwxr-xr-x") }
+}
 
 // 모든 모듈에 공통으로 적용하는 설정. 모듈별 의존성은 각 모듈의 build.gradle.kts 에 둔다.
 subprojects {
@@ -46,6 +53,7 @@ subprojects {
     if (installGitHook) {
         tasks.matching { it.name == "compileKotlin" }.configureEach {
             dependsOn(rootProject.tasks.named("addKtlintFormatGitPreCommitHook"))
+            dependsOn(installCommitMsgHook)
         }
     }
 

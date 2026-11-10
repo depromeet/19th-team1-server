@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# 커밋 메시지 규칙을 검사한다. 브랜치 이름에 이슈 번호가 있으면 메시지 첫 줄 끝에 (#번호)를 자동으로 붙인다.
+# ./gradlew 로 처음 빌드할 때 .git/hooks 에 자동으로 설치된다.
+set -euo pipefail
+
+msg_file="$1"
+check="$(git rev-parse --show-toplevel)/scripts/check-convention.sh"
+branch="$(git symbolic-ref --short -q HEAD || true)"
+subject="$(head -n 1 "$msg_file")"
+
+if issue="$("$check" issue-from-branch "$branch" 2>/dev/null)" && "$check" needs-issue "$subject"; then
+  tmp="$(mktemp)"
+  { printf '%s (#%s)\n' "$subject" "$issue"; tail -n +2 "$msg_file"; } > "$tmp"
+  cat "$tmp" > "$msg_file"
+  rm -f "$tmp"
+fi
+
+"$check" message "$(head -n 1 "$msg_file")"

@@ -27,6 +27,13 @@ docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
 - 모듈: `core`(도메인·서비스·경계 인터페이스), `storage`(DB 구현), `external`(외부 연동 구현), `api`(진입점, 실행 모듈)
 - 버전은 `gradle/libs.versions.toml`에서, 라이브러리 버전은 Spring Boot BOM에서 관리한다. 모듈의 `build.gradle.kts`에는 버전을 적지 않는다.
 
+## 코드 스타일
+
+- 스타일 규칙의 원본은 `.editorconfig`다. ktlint가 이 파일을 읽어 검사한다.
+- 커밋할 때 git pre-commit 훅이 스테이지된 Kotlin 파일을 자동으로 포맷해 커밋에 포함한다. 훅은 로컬에서 처음 빌드할 때 자동으로 설치된다.
+- `./gradlew build`와 PR 검사에는 포맷 검사(`ktlintCheck`)가 포함된다. 훅을 건너뛴 커밋(`--no-verify`)은 여기서 걸린다.
+- 에이전트가 Gradle을 실행할 수 없는 환경에서 커밋했다면, 사람이 푸시하기 전에 `./gradlew ktlintFormat`을 실행하도록 알린다.
+
 ## 작업 규칙
 
 - **범위**: 이슈에 적힌 범위만 작업한다. 다음 이슈에서 필요할 것 같은 코드를 미리 만들지 않는다.

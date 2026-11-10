@@ -1,3 +1,21 @@
 spring:
   application:
     name: team1-server
+  profiles:
+    # SPRING_PROFILES_ACTIVE 를 주지 않으면 local 로 뜬다. 서버에서는 반드시 dev 또는 prod 를 지정한다.
+    default: local
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # 스키마는 Flyway 가 만들고, Hibernate 는 엔티티와 맞는지만 검사한다.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    locations: classpath:db/migration

@@ -12,11 +12,13 @@
 | --- | --- |
 | [docs/architecture.md](docs/architecture.md) | 배포 구성, 모듈·패키지 구조, 도메인 모델, 확장 지점, 결정 기록 |
 | [docs/conventions.md](docs/conventions.md) | 브랜치·커밋·PR 규칙 |
+| [docs/deployment.md](docs/deployment.md) | 빌드·실행 전제, 프로필, 환경변수 목록 |
 
 ## 빌드·실행
 
 ```bash
-./gradlew build                 # 전체 빌드 + 테스트
+docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
+./gradlew build                 # 전체 빌드 + 테스트 (Docker 필요)
 ./gradlew :api:bootRun          # 애플리케이션 실행
 ./gradlew :core:test            # 모듈별 테스트
 ./gradlew :core:test --tests "com.depromeet.team1.core.SomeTest"   # 테스트 클래스 하나

@@ -275,14 +275,16 @@ sequenceDiagram
 ## 9. 공통 규약
 
 - **API 경로**: `/api/v1/...`
-- **응답 포맷** `[제안]`: HTTP 상태 코드를 그대로 쓰고, 본문은 아래 형태로 통일한다.
+- **응답 포맷** `[제안]`: HTTP 상태 코드를 그대로 쓰고, 본문은 아래 형태로 통일한다. 형식은 `api`의 `web/common`(`ApiResponse`, `ErrorResponse`)에 있다.
   - 성공: `{ "data": { ... } }`
   - 실패: `{ "code": "ITEM_NOT_FOUND", "message": "..." }`
 - **에러 처리**
-  - 도메인은 HTTP를 모른다. 에러 코드는 분류(`ErrorType`: 입력 오류, 없음, 충돌, 권한, 외부 실패, 내부 오류 등)만 가지고, HTTP 상태는 `api`가 분류를 보고 정한다.
-  - 에러 코드는 기능별 enum으로 `core`의 해당 기능 패키지에 둔다.
+  - 도메인은 HTTP를 모른다. 에러 코드는 분류(`ErrorType`: 입력 오류, 인증, 권한, 없음, 충돌, 외부 실패, 내부 오류)만 가지고, HTTP 상태는 `api`가 분류를 보고 정한다.
+  - 에러 코드는 `ErrorCode`를 구현한 기능별 enum으로 `core`의 해당 기능 패키지에 둔다. 응답의 `code`는 enum 이름이고, 기능 간 겹치지 않게 기능 이름으로 시작한다 (예: `ITEM_NOT_FOUND`). 공통 코드는 `core/common/error/CommonErrorCode`.
+  - 업무 규칙 위반은 `BusinessException(에러 코드, 상세)`로 던진다.
   - 응답 메시지는 에러 코드에 정의된 문구만 쓴다. 상세 사유는 로그에만 남긴다.
-  - 변환은 `api`의 `@RestControllerAdvice` 한 곳에서 한다.
+  - 변환은 `api`의 `GlobalExceptionHandler` 한 곳에서 한다. 서버 쪽 문제(`EXTERNAL_FAILURE`, `INTERNAL`)는 ERROR, 나머지는 WARN으로 기록한다.
+- **API 문서**: springdoc으로 `/swagger-ui.html`에 생성한다. `prod` 프로필에서는 꺼 둔다.
 - **스키마 관리**: Flyway. 애플리케이션은 스키마를 만들지 않는다(`ddl-auto: validate`).
 - **시간**: UTC 저장, 응답은 ISO-8601
 - **프로필과 환경변수**: `local` / `dev` / `prod`. 목록과 주입 방법은 [docs/deployment.md](deployment.md)에 둔다. 값은 코드·설정·문서에 넣지 않는다.
@@ -315,7 +317,7 @@ sequenceDiagram
 | 1 | MySQL 위치 | 앱과 같은 서버에 컨테이너 + 일 1회 덤프 | 서버 |
 | 2 | 모듈 안 패키지 배치 | 기능 우선 (6장) | 서버 |
 | 3 | 주제 저장 형태 | `item_topic` 별도 테이블 | 서버 |
-| 4 | 응답 포맷 | 9장 형태 | 서버 + 웹 |
+| 4 | 응답 포맷 | 9장 형태로 구현해 두었다. 웹팀 확인 후 확정 | 서버 + 웹 |
 | 5 | 열람 진입 경로 전달 방식 | 상세 조회 파라미터 | 서버 + 웹 |
 | 6 | 인증 방식 | 미정 | 서버 + 웹 + 기획 |
 | 7 | 클라우드 | 미정 | 크레딧 지원 여부 확인 후 |

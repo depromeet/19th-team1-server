@@ -4,14 +4,16 @@ import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import org.junit.jupiter.api.Test
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.web.bind.annotation.RestController
 
 /**
  * 모듈 안의 구조 규칙을 검사한다. 모듈 사이의 의존 방향은 Gradle 설정이 컴파일 단계에서 막으므로 여기서 다루지 않는다.
- * 규칙 설명은 docs/architecture.md 6장을 따른다.
+ * 규칙은 .claude/rules/architecture.md, 검사 목록은 docs/architecture.md 6장에 있다.
  */
 class ArchitectureTest {
     @Test
@@ -33,7 +35,7 @@ class ArchitectureTest {
     }
 
     @Test
-    fun `JPA 엔티티는 storage 에 두고 이름을 JpaEntity 로 끝낸다`() {
+    fun `JPA 엔티티는 infra 의 storage 패키지에 두고 이름을 JpaEntity 로 끝낸다`() {
         classes().that().areAnnotatedWith("jakarta.persistence.Entity")
             .should().resideInAPackage(STORAGE)
             .andShould().haveSimpleNameEndingWith("JpaEntity")
@@ -49,10 +51,19 @@ class ArchitectureTest {
             .check(productionClasses)
     }
 
+    @Test
+    fun `예약 작업은 worker 에 둔다`() {
+        methods().that().areAnnotatedWith(Scheduled::class.java)
+            .should().beDeclaredInClassesThat().resideInAPackage(WORKER)
+            .because("요청 없이 도는 진입점을 한 모듈에 모아, 나중에 따로 배포할 수 있게 한다")
+            .check(productionClasses)
+    }
+
     companion object {
         private const val CORE = "com.depromeet.team1.core.."
-        private const val STORAGE = "com.depromeet.team1.storage.."
+        private const val STORAGE = "com.depromeet.team1.infra.storage.."
         private const val API_WEB = "com.depromeet.team1.api.web.."
+        private const val WORKER = "com.depromeet.team1.worker.."
 
         private val productionClasses: JavaClasses = ClassFileImporter()
             .withImportOption(ImportOption.DoNotIncludeTests())

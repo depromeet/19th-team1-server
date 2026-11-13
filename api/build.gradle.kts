@@ -5,17 +5,18 @@ plugins {
 dependencies {
     implementation(project(":core"))
 
-    // 구현 모듈은 실행할 때만 담는다. api 코드에서 storage·external 의 클래스를 직접 쓰면 컴파일되지 않는다.
-    runtimeOnly(project(":storage"))
-    runtimeOnly(project(":external"))
+    // 구현 모듈과 워커는 실행할 때만 담는다. api 코드에서 infra·worker 의 클래스를 직접 쓰면 컴파일되지 않는다.
+    runtimeOnly(project(":infra"))
+    runtimeOnly(project(":worker"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation(libs.springdoc.webmvc.ui)
 
-    testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    testImplementation("org.testcontainers:testcontainers-mysql")
+    // 테스트용 MySQL 컨테이너 설정을 가져온다.
+    testImplementation(testFixtures(project(":infra")))
     testImplementation(libs.archunit)
 }
 

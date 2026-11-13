@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController
 
 /**
  * 모듈 안의 구조 규칙을 검사한다. 모듈 사이의 의존 방향은 Gradle 설정이 컴파일 단계에서 막으므로 여기서 다루지 않는다.
- * 규칙 설명은 docs/architecture.md 6장을 따른다.
+ * 규칙은 .claude/rules/architecture.md, 검사 목록은 docs/architecture.md 6장에 있다.
  */
 class ArchitectureTest {
     @Test

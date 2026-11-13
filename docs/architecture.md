@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 | --- | --- |
 | 범위 | 배포 구성, 모듈·패키지 구조, 도메인 모델, 확장 지점, 공통 규약 |
-| 범위 밖 | 클라우드 선택과 서버 구축 절차, CI/CD, 코드 컨벤션 → 각각 별도 문서 |
+| 범위 밖 | 테스트 전략([testing.md](testing.md)), 브랜치·커밋 규칙([conventions.md](conventions.md)), 빌드·배포([deployment.md](deployment.md)) |
 
 > 이 문서는 "기획 방향(A/B안)이 정해지기 전에도 만들 수 있는 것"과 "정해진 뒤 갈아끼울 것"의 경계를 정한다.
 > 확정된 내용은 [10. 결정 기록](#10-결정-기록)에, 아직 정하지 않은 내용은 [11. 남은 결정](#11-남은-결정)에 모았다. 본문의 `[제안]`은 남은 결정에 해당하는 부분이다.
@@ -20,7 +20,7 @@
 - **규모**: 프리런칭 사용자 30명 이하. 이후 확장을 전제로 한다.
 - **비용**: 서버·LLM 비용을 팀이 직접 부담한다. 서버는 최소 사양으로 시작한다.
 - **핵심 지표**: 자발 재열람 (알림을 통하지 않고 검색·목록으로 다시 여는 것).
-- **스택**: JDK 25, Kotlin 2.3, Spring Boot 4.1, Gradle 9, MySQL, Swagger(springdoc). 추가 DB는 방향 확정 후 검토한다. 정확한 버전은 `gradle/libs.versions.toml`과 Gradle wrapper 설정이 원본이다.
+- **스택**: JDK 25, Kotlin 2.3, Spring Boot 4.1(Spring MVC, 가상 스레드), Gradle 9, MySQL, Swagger(springdoc). 추가 DB는 방향 확정 후 검토한다. 정확한 버전은 `gradle/libs.versions.toml`과 Gradle wrapper 설정이 원본이다.
 
 ## 2. 설계 원칙
 
@@ -54,46 +54,47 @@
 
 ```mermaid
 flowchart TB
-    api["api<br/>컨트롤러 · 스케줄러 · 워커 · 설정"]
+    api["api<br/>컨트롤러 · 설정 · 실행 클래스"]
+    worker["worker<br/>작업 폴링 · 스케줄러"]
     core["core<br/>도메인 모델 · 서비스 · 경계 인터페이스"]
-    storage["storage<br/>DB 구현 (mysql 로 시작)"]
-    external["external<br/>LLM · 푸시 · 파일 저장소 구현"]
+    infra["infra<br/>DB 구현 · 외부 연동 구현"]
 
     api --> core
-    storage --> core
-    external --> core
-    api -. 실행 시 조립 .-> storage
-    api -. 실행 시 조립 .-> external
+    worker --> core
+    infra --> core
+    api -. 실행 시 조립 .-> infra
+    api -. 실행 시 조립 .-> worker
 ```
 
 | 모듈 | 역할 | 의존 가능 대상 | 쓸 수 있는 기술 |
 | --- | --- | --- | --- |
 | `core` | 도메인 모델, 서비스, 경계 인터페이스 | 없음 | Spring의 DI·트랜잭션 어노테이션까지. JPA, 웹, HTTP 클라이언트, LLM SDK 금지 |
-| `storage` | 경계 인터페이스의 DB 구현 | `core` | JPA, MySQL 드라이버, Flyway |
-| `external` | 경계 인터페이스의 외부 연동 구현 | `core` | HTTP 클라이언트, LLM SDK, 푸시 SDK |
-| `api` | 진입점(컨트롤러·스케줄러·워커)과 설정. 실행 모듈 | `core` (코드에서), `storage`·`external` (실행 시 조립만) | Spring Web, springdoc |
+| `infra` | 경계 인터페이스의 구현. DB(`storage`)와 외부 연동(`external`)을 패키지로 나눈다 | `core` | JPA, MySQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, 푸시 SDK |
+| `api` | 요청으로 시작하는 진입점(컨트롤러)과 설정. 실행 모듈 | `core` (코드에서), `infra`·`worker` (실행 시 조립만) | Spring MVC, springdoc, actuator |
+| `worker` | 요청 없이 도는 진입점(작업 폴링, 스케줄러) | `core` | Spring의 스케줄링 |
 
 - 화살표는 전부 `core`를 향한다. `core`의 서비스는 자기 안의 경계 인터페이스만 알고, 구현이 어떤 기술인지 모른다.
-- `api`는 `storage`·`external`을 Gradle `runtimeOnly`로 의존한다. 컨트롤러에서 JPA 엔티티나 LLM 클라이언트를 직접 쓰면 컴파일되지 않는다.
+- `api`는 `infra`·`worker`를 Gradle `runtimeOnly`로 의존한다. 컨트롤러에서 JPA 엔티티나 LLM 클라이언트를 직접 쓰면 컴파일되지 않는다.
+- 실행 파일은 `api` 하나다. `worker`는 `api`가 실행할 때 포함해 같은 프로세스에서 돈다.
 
 **모듈 경계마다 컴파일러가 막아 주는 것**
 
 | 경계 | 막는 것 |
 | --- | --- |
-| `core` ↔ `storage` | 서비스가 DB 기술을 직접 쓰는 것 |
-| `core` ↔ `external` | 서비스가 LLM SDK나 HTTP 클라이언트를 직접 쓰는 것 |
-| `storage` ↔ `external` | 저장소 구현과 외부 연동 구현이 서로를 부르는 것 |
-| `api` ↔ 구현 모듈 | 진입점이 서비스를 건너뛰고 구현을 직접 쓰는 것 |
+| `core` ↔ `infra` | 서비스가 DB 기술, LLM SDK, HTTP 클라이언트를 직접 쓰는 것 |
+| `api`·`worker` ↔ `infra` | 진입점이 서비스를 건너뛰고 구현을 직접 쓰는 것 |
+| `api` ↔ `worker` | 컨트롤러와 워커가 서로의 코드를 부르는 것. 공유할 로직은 `core`의 서비스에 둔다 |
+
+`infra` 안에서 저장소 구현과 외부 연동 구현이 서로를 부르는 것은 컴파일러가 막지 못한다. 코드 리뷰로 본다.
 
 **확장할 때 하는 일**
 
 | 생기는 일 | 하는 일 | 기존 코드 변경 |
 | --- | --- | --- |
-| DB 기술 추가 (캐시, 검색 등) | `storage`에 기술 패키지 추가 | `core`에 인터페이스 추가 |
-| 일부 배포 단위만 쓰는 DB 기술이 생김 | 그 기술을 `storage`에서 별도 모듈로 분리 | 파일 이동 |
-| 워커·스케줄러를 따로 배포 | `worker` 모듈 추가, 해당 패키지 이동 | 서비스는 `core`에 있어 그대로 |
-| 메시지 큐 도입 | `external`에 구현 추가 | `JobQueue` 구현체 교체 |
-| A/B 방향 확정 | `external`에 분석기 구현, `api`에 입력 컨트롤러 | `core`의 인터페이스는 그대로 |
+| DB 기술 추가 (캐시, 검색 등) | `infra`의 `storage`에 기술 패키지 추가 | `core`에 인터페이스 추가 |
+| 워커·스케줄러를 따로 배포 | `worker`에 실행 클래스를 두고 실행 모듈로 전환 | 서비스는 `core`에, 워커 코드는 이미 `worker`에 있어 그대로 |
+| 메시지 큐 도입 | `infra`의 `external`에 구현 추가 | `JobQueue` 구현체 교체 |
+| A/B 방향 확정 | `infra`에 분석기 구현, `api`에 입력 컨트롤러 | `core`의 인터페이스는 그대로 |
 
 ## 6. 패키지 구조
 
@@ -115,35 +116,44 @@ core        com.depromeet.team1.core
 ├── llm/                LLM 호출 인터페이스, 사용량 상한
 └── common/             공통 에러 타입, 공용 값
 
-storage     com.depromeet.team1.storage
-└── mysql/
-    ├── item/           ItemJpaEntity, ItemJpaRepository(Spring Data), JpaItemRepository(구현), 변환 함수
-    ├── …               (core 의 기능 이름과 맞춘다)
-    └── config/         JPA 설정
-    resources/db/migration/   Flyway 스크립트
-
-external    com.depromeet.team1.external
-├── llm/                LLM 클라이언트, 분석기 구현
-├── push/               푸시 발송 구현
-└── file/               파일 저장소 구현
+infra       com.depromeet.team1.infra
+├── storage/mysql/
+│   ├── item/           ItemJpaEntity, ItemJpaRepository(Spring Data), JpaItemRepository(구현), 변환 함수
+│   ├── …               (core 의 기능 이름과 맞춘다)
+│   └── config/         JPA 설정
+├── external/
+│   ├── llm/            LLM 클라이언트, 분석기 구현
+│   ├── push/           푸시 발송 구현
+│   └── file/           파일 저장소 구현
+└── resources/db/migration/   Flyway 스크립트
 
 api         com.depromeet.team1.api    (실행 클래스 ApiApplication 만 com.depromeet.team1 에 둔다)
 ├── web/<feature>/      컨트롤러, 요청·응답 DTO
 ├── web/common/         응답 포맷, 예외 변환, 현재 사용자 해석
-├── scheduler/          정해진 시각에 도는 작업
-├── worker/             작업 테이블 폴링
-├── config/             Swagger 등 설정
+└── config/             Swagger 등 설정
+
+worker      com.depromeet.team1.worker
+├── job/                작업 테이블 폴링, 작업 실행
+└── schedule/           정해진 시각에 도는 작업
 ```
 
 **규칙**
 
-- 진입점(컨트롤러·스케줄러·워커)은 `core`의 서비스를 직접 호출한다. 서비스마다 인터페이스를 따로 만들지 않는다. 구현이 둘 이상 필요해지면 그때 추출한다.
-- 인터페이스는 바깥 기술과 닿는 경계에만 둔다. `core`가 인터페이스를 소유하고 `storage`·`external`이 구현한다.
+- 진입점(컨트롤러·워커·스케줄러)은 `core`의 서비스를 직접 호출한다. 서비스마다 인터페이스를 따로 만들지 않는다. 구현이 둘 이상 필요해지면 그때 추출한다.
+- 인터페이스는 바깥 기술과 닿는 경계에만 둔다. `core`가 인터페이스를 소유하고 `infra`가 구현한다.
 - 경계 인터페이스는 도메인 모델만 주고받는다. JPA 엔티티나 외부 응답 DTO를 노출하지 않는다.
-- 도메인 모델과 JPA 엔티티는 분리한다. 변환은 `storage`의 구현체가 맡는다.
+- 도메인 모델과 JPA 엔티티는 분리한다. 변환은 `infra`의 구현체가 맡는다.
 - 구현 클래스 이름은 기술 이름 + 인터페이스 이름으로 짓는다. (`ItemRepository` → `JpaItemRepository`)
 - 요청·응답 DTO는 `api`에만 둔다. 서비스에는 도메인 값이나 명령 객체로 바꿔 넘긴다.
 - 기능 간에는 상대의 서비스를 호출하고, 엔티티를 직접 참조하지 않고 ID로 연결한다.
+- 진입점은 로직을 갖지 않는다. 워커와 스케줄러도 때가 되면 서비스를 호출할 뿐이다.
+
+**트랜잭션**
+
+- 요청 하나에서 함께 저장돼야 하는 일은 서비스 메서드에 `@Transactional`을 붙여 한 번에 커밋한다. (예: 저장물과 처리 작업을 같이 등록)
+- 외부 호출(LLM, 푸시, 링크 수집)을 하는 서비스 메서드에는 `@Transactional`을 붙이지 않는다. 응답을 기다리는 동안 DB 커넥션을 잡지 않기 위해서다.
+- 그런 흐름은 "DB에서 읽기 → 외부 호출 → 결과 저장"으로 끊고, 각 단계는 저장소 메서드 하나가 스스로 커밋한다. 여러 건을 함께 바꿔야 하는 단계는 저장소 메서드 하나로 묶는다. (예: 작업 획득, 작업 완료와 저장물 갱신)
+- 그래서 `infra`의 저장소 구현은 쓰기 메서드에 `@Transactional`을 붙인다. 서비스가 이미 트랜잭션을 열었으면 거기에 참여한다.
 
 모듈 간 의존은 컴파일러가 강제한다. 모듈 안의 규칙은 아키텍처 테스트(`api/src/test/kotlin/com/depromeet/team1/architecture/ArchitectureTest.kt`)가 `./gradlew build`에서 검사한다.
 
@@ -151,9 +161,11 @@ api         com.depromeet.team1.api    (실행 클래스 ApiApplication 만 com.
 | --- | --- |
 | `core`에서 서비스가 아닌 클래스(도메인 모델, 경계 인터페이스)는 Spring에 의존하지 않는다 | 아키텍처 테스트 |
 | `core`의 서비스는 `@Service`로 등록한다 | 아키텍처 테스트 |
-| JPA 엔티티는 `storage`에 두고 이름을 `JpaEntity`로 끝낸다 | 아키텍처 테스트 |
+| JPA 엔티티는 `infra`의 `storage` 패키지에 두고 이름을 `JpaEntity`로 끝낸다 | 아키텍처 테스트 |
 | 컨트롤러는 `api`의 `web` 패키지에 두고 이름을 `Controller`로 끝낸다 | 아키텍처 테스트 |
+| 예약 작업(`@Scheduled`)은 `worker`에 둔다 | 아키텍처 테스트 |
 | 기능 간에는 상대 서비스를 호출하고 ID로 연결한다 | 코드 리뷰 |
+| 외부 호출을 하는 서비스 메서드에 `@Transactional`을 붙이지 않는다 | 코드 리뷰 |
 
 ## 7. 도메인 모델
 
@@ -217,7 +229,7 @@ api         com.depromeet.team1.api    (실행 클래스 ApiApplication 만 com.
 
 | 인터페이스 (`core`) | 역할 | 지금 넣는 구현 | 나중에 넣을 구현 |
 | --- | --- | --- | --- |
-| `XxxRepository` | 도메인 모델 저장·조회 | `storage`의 MySQL 구현 | 필요 시 다른 DB 구현 추가 |
+| `XxxRepository` | 도메인 모델 저장·조회 | `infra`의 MySQL 구현 | 필요 시 다른 DB 구현 추가 |
 | `ItemAnalyzer` | 저장물 → 요약·주제·추가 정보 | 고정값을 돌려주는 가짜 구현 | 비전 LLM(A) / 텍스트 LLM(B) |
 | `LlmClient` | LLM 호출 | 인터페이스만 | 선택한 LLM 벤더 클라이언트 |
 | `JobQueue` | 작업 등록·획득 | DB 작업 테이블 | 메시지 큐 |
@@ -236,7 +248,7 @@ sequenceDiagram
     participant C as 클라이언트
     participant A as api (컨트롤러)
     participant DB as MySQL
-    participant W as api (워커)
+    participant W as worker
     participant L as ItemAnalyzer
 
     C->>A: 저장 요청 (단건 또는 가져오기 묶음)
@@ -255,13 +267,14 @@ sequenceDiagram
 
 - Item과 Job을 한 트랜잭션에 저장하므로 "저장됐는데 작업이 없는" 상태가 생기지 않는다.
 - 작업 획득에 `SELECT ... FOR UPDATE SKIP LOCKED`를 써서 인스턴스가 늘어도 중복 처리하지 않는다.
-- 워커의 동시 처리 수에 상한(`WORKER_CONCURRENCY`)을 둔다. API와 같은 프로세스에서 돌기 때문이다.
+- 워커의 동시 처리 수에 상한(`WORKER_CONCURRENCY`)을 둔다. API와 같은 프로세스에서 돌고 DB 커넥션을 나눠 쓰기 때문이다.
+- 분석(LLM 호출)은 트랜잭션 밖에서 한다. 획득과 결과 저장이 각각 따로 커밋된다. (6장 트랜잭션)
 - 오래 `RUNNING`으로 남은 작업은 스케줄러가 `READY`로 되돌린다. (배포·장애로 중단된 작업 복구)
 - **메시지 큐 교체 경계**: `JobQueue`의 등록은 발행으로, 워커의 폴링은 구독으로 바뀐다. 작업을 실제로 수행하는 서비스는 그대로 쓴다.
 
 ### 예약 작업
 
-스케줄러는 진입점이다. 시각이 되면 `core`의 서비스를 호출할 뿐, 로직을 갖지 않는다.
+스케줄러는 `worker`에 두는 진입점이다. 시각이 되면 `core`의 서비스를 호출할 뿐, 로직을 갖지 않는다.
 
 | 작업 | 시점 | 방향 |
 | --- | --- | --- |
@@ -285,6 +298,9 @@ sequenceDiagram
   - 응답 메시지는 에러 코드에 정의된 문구만 쓴다. 상세 사유는 로그에만 남긴다.
   - 변환은 `api`의 `GlobalExceptionHandler` 한 곳에서 한다. 500대 응답은 ERROR, 나머지는 WARN으로 기록한다. 모니터링을 붙이면 ERROR를 알림 기준으로 삼는다.
 - **API 문서**: springdoc으로 `/swagger-ui.html`에 생성하되 참고용이다. API 규격을 무엇으로 관리할지는 정하지 않았다(11장). `prod` 프로필에서는 꺼 둔다.
+- **상태 확인**: actuator의 `/actuator/health`만 연다. 배포 후 확인과 외부 상태 점검에 쓴다. 힙 덤프·환경변수 같은 엔드포인트는 비밀값이 드러날 수 있어 열지 않는다.
+- **로그**: LLM에 보낸 내용과 받은 응답 원문, 사용자가 저장한 내용은 로그에 남기지 않는다. 저장물·작업 번호만 남긴다.
+- **테스트**: 계층별 방식과 규칙은 [docs/testing.md](testing.md)에 둔다.
 - **스키마 관리**: Flyway. 애플리케이션은 스키마를 만들지 않는다(`ddl-auto: validate`).
 - **시간**: UTC 저장, 응답은 ISO-8601
 - **프로필과 환경변수**: `local` / `dev` / `prod`. 목록과 주입 방법은 [docs/deployment.md](deployment.md)에 둔다. 값은 코드·설정·문서에 넣지 않는다.
@@ -296,16 +312,20 @@ sequenceDiagram
 | API·스케줄러·워커를 한 프로세스로 | 서버 비용이 메모리 크기로 정해진다. 프로세스를 나누면 서버 등급이 올라가는데 30명 규모에서 얻는 것이 없다. 역할 플래그로 나중에 나눌 수 있다 |
 | 배포 중 끊김 허용 | 무중단 배포의 복잡도를 감수할 규모가 아니다. 중단된 작업은 회수 로직으로 복구한다 |
 | 환경은 local / dev / prod | 개발 서버를 먼저 두고 프리런칭 전에 운영 서버를 추가한다 |
-| 멀티모듈 4개 (`core`, `storage`, `external`, `api`) | 확장이 예정돼 있고 DB 기술이 늘 수 있다. 지키려는 규칙을 컴파일러가 강제하게 한다 |
+| 멀티모듈 4개 (`core`, `infra`, `api`, `worker`) | 지키려는 규칙을 컴파일러가 강제하게 한다. 코드 대부분을 에이전트가 쓰므로, 문서로만 둔 규칙보다 컴파일 오류가 확실하다 |
 | 화살표가 `core`를 향하는 의존 방향 | `core`가 DB 모듈을 알면 DB 기술을 더하거나 바꿀 때 `core`를 고쳐야 한다 |
-| DB 기술은 `storage` 한 모듈에 패키지로 구분 | 배포 단위가 하나인 동안은 기술별 모듈의 이점이 없다. 필요해지면 모듈로 분리한다 |
-| `storage`와 `external`은 분리 | 테스트 방식이 다르고(실제 DB / 가짜 서버), 방향 확정 후 바뀌는 코드가 `external`에 모인다 |
+| DB와 외부 연동 구현을 `infra` 한 모듈에 패키지로 구분 | 둘 다 "`core`의 경계 인터페이스를 구현한다"는 같은 역할이다. 모듈을 나눠 얻는 것은 둘이 서로를 부르지 못하게 하는 것뿐인데, 2명 규모에서는 코드 리뷰로 충분하다 |
+| 워커·스케줄러를 `worker` 모듈로 분리, 실행은 `api`와 한 프로세스 | 컨트롤러와 워커가 서로의 코드를 부르지 못하게 하고, 나중에 따로 배포할 때 옮길 코드가 없게 한다. 프로세스를 나누지 않는 이유는 서버 비용이다 |
+| 헥사고날 구조를 전부 따르지 않음 | 의존 방향을 안쪽으로 모으는 것과 바깥 경계의 인터페이스는 가져온다. 서비스마다 두는 입력 인터페이스, 유스케이스별 클래스, 계층마다의 모델 변환은 가져오지 않는다. 구현이 하나뿐인 인터페이스와 변환 코드는 2명·3개월 일정에서 비용만 든다 |
+| Spring MVC + 가상 스레드, WebFlux 미사용 | JPA가 블로킹이라 WebFlux의 이점을 얻기 어렵고, 오래 걸리는 LLM 호출은 워커가 요청 밖에서 처리한다. 응답을 기다리는 동안 스레드를 잡는 문제는 가상 스레드로 푼다 |
+| 트랜잭션은 서비스의 `@Transactional`, 외부 호출이 낀 흐름은 저장소 메서드 단위 커밋 | 함께 저장할 일이 많은 요청 처리에서는 묶는 쪽이 기본이어야 실수가 적다. 외부 호출을 기다리는 동안 DB 커넥션을 잡지 않으려고 그 흐름만 끊는다 |
+| 서비스 테스트는 직접 만든 가짜 구현으로, 쿼리는 실제 MySQL로 | 목은 구현을 그대로 따라 적기 쉬워 틀린 코드도 통과시킨다. 쿼리는 실행해 봐야 검증된다. 상세는 [testing.md](testing.md) |
 | 서비스 인터페이스를 두지 않음 | 구현이 하나뿐인 인터페이스는 코드만 늘린다. 바깥 기술과 닿는 경계에만 인터페이스를 둔다 |
 | 도메인 모델과 JPA 엔티티 분리 | `core`가 DB 기술을 모르게 하려면 필요하다. 비용은 변환 코드 |
-| 스케줄러는 `api` 안의 진입점, 배치 프레임워크 미사용 | 예약 작업은 필요하지만 규모상 `@Scheduled`와 쿼리로 충분하다 |
+| 스케줄러는 `worker`의 진입점, 배치 프레임워크 미사용 | 예약 작업은 필요하지만 규모상 `@Scheduled`와 쿼리로 충분하다 |
 | JDK 25 + Spring Boot 4.1 + Kotlin 2.3 + Gradle 9 | 시작 시점의 최신 LTS JDK와 최신 안정 버전이다. Kotlin은 2.3부터 JDK 25를 지원한다. 서버는 컨테이너로 실행하므로 JDK 버전이 클라우드 선택에 영향을 주지 않는다 |
 | 기본 패키지는 `com.depromeet.team1` | 패키지명은 바꾸는 비용이 크다. 서비스명과 무관한 이름으로 고정하고, 서비스명은 문서 제목과 애플리케이션 이름에만 쓴다 |
-| 실행 모듈 이름은 `api` | 배포 단위는 주된 역할로 이름 짓는다. 분리 시 `worker`를 옆에 추가한다 |
+| 실행 모듈 이름은 `api` | 배포 단위는 주된 역할로 이름 짓는다 |
 | 로컬 DB는 Docker Compose, 테스트 DB는 Testcontainers | 로컬과 테스트 모두 운영과 같은 MySQL로 돌려, H2 같은 대체 DB와의 문법 차이를 없앤다 |
 | 비동기 처리는 DB 작업 테이블 + 워커 | 추가 인프라 없이 재시도·복구가 가능하다. 메시지 큐는 `JobQueue` 뒤에서 교체한다 |
 | 가져오기 묶음과 예약 알림을 공통 뼈대에 포함 | 두 방향 모두 첫 진입에서 수백 건을 한 번에 가져오고, 정해진 시각에 알림을 보낸다 |
@@ -333,10 +353,11 @@ sequenceDiagram
 | 항목 | 넣지 않는 이유 | 도입 시점·확장 지점 |
 | --- | --- | --- |
 | 메시지 큐 | 현재 규모에 불필요, 비용 미확인 | 프리런칭 이후. `JobQueue` 구현 교체 |
-| 추가 DB (캐시, 검색, 벡터) | 방향 미확정. 하나 늘 때마다 서버 메모리가 는다 | 방향 확정 후. `storage`에 패키지 추가 |
-| 워커·스케줄러 분리 배포 | 서버 비용 | 부하가 생기면. `worker` 모듈 추가 |
+| 추가 DB (캐시, 검색, 벡터) | 방향 미확정. 하나 늘 때마다 서버 메모리가 는다 | 방향 확정 후. `infra`의 `storage`에 패키지 추가 |
+| 워커·스케줄러 분리 배포 | 서버 비용 | 부하가 생기면. `worker`를 실행 모듈로 전환 |
 | 스케줄 중복 실행 잠금 | 환경마다 서버가 1대 | 서버를 2대 이상으로 늘릴 때 |
 | 정적 분석 (detekt) | 안정 버전(1.x)이 JDK 25에서 실행되지 않는다. 포맷 검사는 ktlint로 한다 | detekt 2.0 정식 출시 후 |
+| 커버리지 수치 기준 | 수치를 채우려는 테스트만 늘어난다 | 도입하지 않는다. 테스트 규칙은 [testing.md](testing.md) |
 | 무중단 배포, 인프라 코드화, APM | 최소 구성 원칙 | 여유가 생기면 |
 
 ## 13. 인프라 전제

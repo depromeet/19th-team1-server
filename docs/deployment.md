@@ -18,6 +18,7 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 - 테스트가 MySQL 컨테이너를 띄우므로 빌드하는 곳에 Docker가 있어야 한다.
 - 산출물은 `api/build/libs/` 아래 실행 jar 하나다.
 - 실행: `java -jar api/build/libs/api-0.0.1-SNAPSHOT.jar`
+- 상태 확인: `GET /actuator/health`. 정상이면 200과 `{"status":"UP"}`을 돌려준다. 배포 후 확인과 외부 상태 점검에 쓴다.
 
 ## 3. 프로필
 

@@ -12,4 +12,4 @@ dependencyResolutionManagement {
     }
 }
 
-include("core", "storage", "external", "api")
+include("core", "infra", "api", "worker")

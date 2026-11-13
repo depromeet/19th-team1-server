@@ -11,6 +11,7 @@
 | 문서 | 내용 |
 | --- | --- |
 | [docs/architecture.md](docs/architecture.md) | 배포 구성, 모듈·패키지 구조, 도메인 모델, 확장 지점, 결정 기록 |
+| [docs/testing.md](docs/testing.md) | 계층별 테스트 방식, 가짜 구현·목·실제 DB를 쓰는 기준, 테스트 규칙 |
 | [docs/conventions.md](docs/conventions.md) | 브랜치·커밋·PR 규칙 |
 | [docs/deployment.md](docs/deployment.md) | 빌드·실행 전제, 프로필, 환경변수 목록 |
 
@@ -24,7 +25,7 @@ docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
 ./gradlew :core:test --tests "com.depromeet.team1.core.SomeTest"   # 테스트 클래스 하나
 ```
 
-- 모듈: `core`(도메인·서비스·경계 인터페이스), `storage`(DB 구현), `external`(외부 연동 구현), `api`(진입점, 실행 모듈)
+- 모듈: `core`(도메인·서비스·경계 인터페이스), `infra`(DB·외부 연동 구현), `api`(컨트롤러, 실행 모듈), `worker`(작업 폴링·스케줄러)
 - 버전은 `gradle/libs.versions.toml`에서, 라이브러리 버전은 Spring Boot BOM에서 관리한다. 모듈의 `build.gradle.kts`에는 버전을 적지 않는다.
 
 ## 코드 스타일
@@ -38,6 +39,8 @@ docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
 
 - **범위**: 이슈에 적힌 범위만 작업한다. 다음 이슈에서 필요할 것 같은 코드를 미리 만들지 않는다.
 - **구조**: 모듈 의존 방향과 패키지 규칙은 `docs/architecture.md`를 따른다. 규칙과 어긋나는 변경이 필요하면 구현하기 전에 사람에게 확인하고, 합의되면 문서를 같은 PR에서 고친다.
+- **테스트**: 기능과 테스트를 같은 PR에 넣는다. 방식은 `docs/testing.md`를 따른다. 실패한 테스트를 통과시키려고 단언을 약하게 고치거나, 테스트를 지우거나 비활성화하지 않는다. 테스트가 틀렸다면 이유를 PR에 적고 고친다.
+- **검증 보고**: 실행한 명령과 결과를 보고한다. 실행하지 못한 검증은 실행하지 못했다고 적고, 완료로 표현하지 않는다.
 - **DB**: 테이블·컬럼·인덱스·제약 조건을 추가하거나 바꾸는 일은 사람의 확인을 받은 뒤에 한다.
 - **비밀값**: 키·비밀번호·토큰·접속 문자열의 실제값을 코드·설정·문서·커밋 메시지·대화에 넣지 않는다. `.env`를 읽거나 출력하지 않는다. `.env.example`에는 이름만 적는다.
 - **문서**: 구조, 규칙, API가 바뀌면 같은 PR에서 문서를 고친다. 문서에는 현재 상태만 적고 변경 이력을 남기지 않는다.

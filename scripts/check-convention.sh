@@ -4,7 +4,7 @@
 set -euo pipefail
 
 TYPES="feat|fix|refactor|docs|test|chore"
-MODULES="core|storage|external|api"
+MODULES="core|infra|api|worker"
 
 MESSAGE_PATTERN="^(${TYPES})(\((${MODULES})(, (${MODULES}))*\))?: .+ \(#[0-9]+\)$"
 BRANCH_PATTERN="^(${TYPES})/[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$"

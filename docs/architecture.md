@@ -371,6 +371,23 @@ sequenceDiagram
 
 빌드 명령, 서버 구축, 배포 절차는 별도 문서(`docs/deployment.md`)에 정리한다.
 
-## 14. 코드 템플릿
+## 14. 기능 하나를 만드는 순서
 
-기능 하나를 도메인 모델부터 컨트롤러까지 구현한 예시를 이 장에 둔다. 새 기능을 만들 때 사람과 에이전트가 같은 모양으로 쓰기 위한 기준이며, 뼈대 구현이 끝난 뒤 실제 저장물(Item) 코드로 채운다.
+안쪽(`core`)에서 바깥쪽으로 작업한다. 파일 이름은 저장물(Item)을 예로 든 것이다.
+
+| 순서 | 모듈 | 만드는 것 | 위치 |
+| --- | --- | --- | --- |
+| 1 | `core` | 도메인 모델. 프레임워크 어노테이션 없이 규칙과 상태 변경을 담는다 | `core/item/Item.kt` |
+| 2 | `core` | 경계 인터페이스, 서비스, 에러 코드 | `core/item/ItemRepository.kt`, `ItemService.kt`, `ItemError.kt` |
+| 3 | `core` | 가짜 구현과 서비스 테스트. Spring 없이 서비스를 조립한다 | `core/src/testFixtures`, `core/src/test` |
+| 4 | `infra` | JPA 엔티티, 인터페이스 구현, 변환 함수, Flyway 스크립트 | `infra/storage/mysql/item/`, `resources/db/migration/` |
+| 5 | `infra` | 저장소 테스트. 실제 MySQL에서 쿼리를 실행한다 | `infra/src/test` |
+| 6 | `api` | 컨트롤러, 요청·응답 DTO, 컨트롤러 테스트 | `api/web/item/` |
+| 7 | `worker` | 비동기 작업이 있을 때만. 작업을 가져와 서비스를 호출한다 | `worker/job/` |
+
+- 1~3이 끝나면 DB 없이도 업무 로직이 검증된 상태다. 테이블 설계는 4에서 사람의 확인을 받고 진행한다.
+- 컨트롤러는 요청 DTO를 도메인 값으로 바꿔 서비스에 넘기고, 응답을 `ApiResponse`로 감싼다.
+- 워커와 스케줄러에는 로직을 두지 않는다. 서비스에 둔다.
+- 테스트 방식은 [testing.md](testing.md)를 따른다.
+
+실제 코드 예시는 저장물(Item) 구현이 끝나면 이 장에 그 코드의 위치를 적는다.

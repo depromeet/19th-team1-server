@@ -32,6 +32,20 @@
 - 쿼리를 목으로 검증하지 않는다. `EntityManager`나 Spring Data 리포지토리를 목으로 만든 저장소 테스트는 쿼리를 한 번도 실행하지 않는다.
 - H2 같은 대체 DB를 쓰지 않는다. 작업 획득 쿼리(`SKIP LOCKED`)처럼 MySQL에서만 확인되는 동작이 있다.
 
+**예시** (클래스 이름은 설명용이다)
+
+```kotlin
+// 쓰지 않는 방식: "저장 메서드가 불렸다"만 확인한다. 잘못된 값을 저장해도 통과한다.
+service.register(command)
+verify(repository).save(any())
+
+// 쓰는 방식: 무엇이 저장됐는지 확인한다.
+val items = FakeItemRepository()
+val service = ItemService(items, jobs, clock)
+service.register(command)
+assertEquals(ItemStatus.PENDING, items.all().single().status)
+```
+
 **가짜 구현을 만들 때**
 
 - 실제 구현의 계약을 따른다. 번호 발급, 유니크 제약 위반, 없는 대상 조회 시 동작이 실제와 같아야 한다.

@@ -7,6 +7,11 @@ on:
 permissions:
   contents: read
 
+# 같은 PR에 새로 푸시하거나 제목을 고치면 진행 중인 이전 검사를 취소한다. 결과가 쓰이는 것은 마지막 검사뿐이다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   convention:
     runs-on: ubuntu-latest

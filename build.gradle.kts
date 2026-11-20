@@ -4,6 +4,7 @@ import org.springframework.boot.gradle.plugin.SpringBootPlugin
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.spring) apply false
+    alias(libs.plugins.kotlin.jpa) apply false
     alias(libs.plugins.spring.boot) apply false
     // 루트에도 적용한다. git 커밋 훅 설치 태스크가 루트 프로젝트에만 생긴다.
     alias(libs.plugins.ktlint)

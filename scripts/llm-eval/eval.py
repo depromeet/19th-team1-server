@@ -8,7 +8,7 @@ docs/llm-evaluation.md에 있다.
     python3 eval.py keys  [--models ID,...]   필요한 키 환경변수가 있는지 확인
     python3 eval.py fetch                     링크마다 분석 입력을 만들어 .cache/에 저장
     python3 eval.py run   [--models ID,...]   모델 호출, out/<모델>.jsonl에 저장
-    python3 eval.py score                     out/의 결과를 채점해 표 출력
+    python3 eval.py score                     out/의 결과를 채점해 표 출력, 사람이 볼 review CSV 저장
 
 API 키는 환경변수로만 읽고, 값은 출력하지 않는다.
 """
@@ -25,7 +25,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -66,6 +66,7 @@ class Link:
     memo: str
     label_category: str
     label_keywords: list[str]
+    label_details: dict[str, str] = field(default_factory=dict)  # 카테고리별 상세 정보 정답. 열 이름 label_<필드 키>
 
     @property
     def level(self) -> str:
@@ -86,6 +87,9 @@ def load_links(path: Path = LINKS_CSV) -> list[Link]:
                 memo=(row.get("memo") or "").strip(),
                 label_category=(row.get("label_category") or "").strip(),
                 label_keywords=split_keywords(row.get("label_keywords") or ""),
+                label_details={k[len("label_"):]: (v or "").strip() for k, v in row.items()
+                               if k.startswith("label_") and k not in ("label_category", "label_keywords")
+                               and (v or "").strip()},
             ))
     return links
 
@@ -256,13 +260,34 @@ def build_input(link: Link, get=http_get, body_max_chars: int = 6000, environ=os
 
 # ---------- 프롬프트와 응답 ----------
 
-def system_prompt(categories: list[dict]) -> str:
-    lines = "\n".join(f"- {c['name']}: {c['hint']}" for c in categories)
+def fields_of(config: dict, category: str) -> list[dict]:
+    return [f for f in config["detail_fields"] if f["category"] == category]
+
+
+def system_prompt(config: dict) -> str:
+    cats = "\n".join(f"- {c['name']}: {c['hint']}" for c in config["categories"])
+    detail_lines = []
+    for c in config["categories"]:
+        fs = fields_of(config, c["name"])
+        if not fs:
+            detail_lines.append(f"- {c['name']}: 없음 (모두 빈 문자열)")
+            continue
+        parts = []
+        for f in fs:
+            if f["kind"] == "choice":
+                parts.append(f"{f['label']}({f['key']}): {', '.join(f['choices'])} 중 하나")
+            else:
+                parts.append(f"{f['label']}({f['key']})")
+        detail_lines.append(f"- {c['name']}: " + " / ".join(parts))
     return (
         "사용자가 나중에 다시 쓰려고 저장한 링크를 정리한다. 주어진 정보만 근거로 아래를 한국어로 만든다.\n"
-        f"카테고리는 다음 중 하나만 고른다.\n{lines}\n"
+        f"category: 다음 중 하나만 고른다. 형식(영상·이미지)이 아니라 주제와 활용 목적으로 고른다.\n{cats}\n"
+        "alt_category: 두 카테고리에 걸치거나 분류가 애매하면 두 번째 후보. 애매하지 않으면 빈 문자열.\n"
         "summary: 무엇에 관한 링크인지 두 문장 이내. 정보가 부족하면 아는 만큼만 쓰고 지어내지 않는다.\n"
-        "keywords: 나중에 검색할 때 쓸 핵심 주제어 3~5개. 고유명사(가게, 장소, 제품, 사람 이름)를 우선한다."
+        "keywords: 나중에 검색할 때 쓸 핵심 주제어 3~5개. 고유명사(가게, 장소, 제품, 사람 이름)를 우선한다.\n"
+        "details: 고른 category의 필드만 채우고 나머지 필드는 빈 문자열로 둔다. "
+        "주어진 정보에 근거가 없으면 빈 문자열로 두고 추측하지 않는다.\n"
+        + "\n".join(detail_lines)
     )
 
 
@@ -272,34 +297,58 @@ def user_prompt(item: dict) -> str:
     return "\n".join(f"{k}: {v}" for k, v in fields if v)
 
 
-def output_schema(categories: list[dict]) -> dict:
+def output_schema(config: dict) -> dict:
+    names = [c["name"] for c in config["categories"]]
+    detail_props = {}
+    for f in config["detail_fields"]:
+        detail_props[f["key"]] = ({"type": "string", "enum": f["choices"] + [""]} if f["kind"] == "choice"
+                                  else {"type": "string"})
     return {
         "type": "object",
         "properties": {
-            "category": {"type": "string", "enum": [c["name"] for c in categories]},
+            "category": {"type": "string", "enum": names},
+            "alt_category": {"type": "string", "enum": names + [""]},
             "summary": {"type": "string"},
             "keywords": {"type": "array", "items": {"type": "string"}},
+            "details": {"type": "object", "properties": detail_props,
+                        "required": list(detail_props), "additionalProperties": False},
         },
-        "required": ["category", "summary", "keywords"],
+        "required": ["category", "alt_category", "summary", "keywords", "details"],
         "additionalProperties": False,
     }
 
 
-def validate_output(data: object, categories: list[dict]) -> str:
+def validate_output(data: object, config: dict) -> str:
     """형식이 맞으면 빈 문자열, 아니면 이유."""
+    names = {c["name"] for c in config["categories"]}
     if not isinstance(data, dict):
         return "객체가 아님"
-    if data.get("category") not in {c["name"] for c in categories}:
+    if data.get("category") not in names:
         return f"카테고리 밖: {data.get('category')!r}"
+    alt = data.get("alt_category", "")
+    if alt not in names | {""} or alt == data["category"]:
+        return f"alt_category 잘못됨: {alt!r}"
     if not isinstance(data.get("summary"), str) or not data["summary"].strip():
         return "요약 없음"
     kw = data.get("keywords")
     if not isinstance(kw, list) or not kw or not all(isinstance(k, str) for k in kw):
         return "주제어 없음"
+    details = data.get("details")
+    if not isinstance(details, dict):
+        return "details 없음"
+    for f in config["detail_fields"]:
+        v = details.get(f["key"])
+        if not isinstance(v, str):
+            return f"details.{f['key']} 없음"
+        if f["kind"] == "choice" and v and v not in f["choices"]:
+            return f"details.{f['key']} 선택지 밖: {v!r}"
     return ""
 
 
 # ---------- 채점 ----------
+
+LEVEL_NAMES = {"auto": "자동 정리", "partial": "부분 자동", "memo": "링크 + 메모"}
+
 
 def _norm(s: str) -> str:
     return re.sub(r"[\s·\-_/]", "", s).lower()
@@ -323,11 +372,18 @@ def cost_usd(model: dict, input_tokens: int, output_tokens: int) -> float | None
     return (input_tokens * price["input"] + output_tokens * price["output"]) / 1_000_000
 
 
-def summarize(model: dict, links: dict[str, Link], rows: list[dict]) -> dict:
-    """모델 하나의 결과 행을 집계한다. 정답 라벨이 없는 링크는 정확도에서 뺀다."""
+def summarize(model: dict, links: dict[str, Link], rows: list[dict], config: dict) -> dict:
+    """모델 하나의 결과 행을 집계한다. 정답 라벨이 없는 링크는 정확도에서 뺀다.
+
+    상세 정보는 정답 카테고리의 필드만 본다. (카테고리, 필드, 수집 수준)마다
+    label_n: 정답이 있는 수, filled: 그중 모델이 채운 수, correct: 그중 정답과 같은 수(공백·기호 무시),
+    empty_n: 정답이 빈 수, false_fill: 그중 모델이 채운 수.
+    """
     by_level: dict[str, list[int]] = {}
+    details: dict[tuple, dict] = {}
     total = {"n": len(rows), "ok": 0, "format_errors": 0, "api_errors": 0,
              "cat_n": 0, "cat_hit": 0, "kw_label": 0, "kw_hit": 0,
+             "alt_n": 0, "alt_rescue": 0, "wrong": [],
              "input_tokens": 0, "output_tokens": 0, "latency_s": 0.0}
     for r in rows:
         total["input_tokens"] += r.get("input_tokens", 0)
@@ -340,17 +396,39 @@ def summarize(model: dict, links: dict[str, Link], rows: list[dict]) -> dict:
             total["format_errors"] += 1
             continue
         total["ok"] += 1
+        out = r["output"]
         link = links[r["id"]]
-        if link.label_category:
-            hit = int(r["output"]["category"] == link.label_category)
-            total["cat_n"] += 1
-            total["cat_hit"] += hit
-            by_level.setdefault(link.level, []).append(hit)
+        if out.get("alt_category"):
+            total["alt_n"] += 1
         if link.label_keywords:
             total["kw_label"] += len(link.label_keywords)
-            total["kw_hit"] += keyword_hits(link.label_keywords, r["output"]["keywords"])
+            total["kw_hit"] += keyword_hits(link.label_keywords, out["keywords"])
+        if not link.label_category:
+            continue
+        hit = int(out["category"] == link.label_category)
+        total["cat_n"] += 1
+        total["cat_hit"] += hit
+        by_level.setdefault(link.level, []).append(hit)
+        if not hit:
+            total["wrong"].append((link.id, link.label_category, out["category"], out.get("alt_category", "")))
+            if out.get("alt_category") == link.label_category:
+                total["alt_rescue"] += 1
+        for f in fields_of(config, link.label_category):
+            st = details.setdefault((link.label_category, f["key"], link.level),
+                                    {"label_n": 0, "filled": 0, "correct": 0, "empty_n": 0, "false_fill": 0})
+            label = link.label_details.get(f["key"], "")
+            pred = out["details"].get(f["key"], "").strip()
+            if label:
+                st["label_n"] += 1
+                if pred:
+                    st["filled"] += 1
+                    st["correct"] += int(_norm(pred) == _norm(label))
+            else:
+                st["empty_n"] += 1
+                st["false_fill"] += int(bool(pred))
     total["cost_usd"] = cost_usd(model, total["input_tokens"], total["output_tokens"])
     total["by_level"] = {lv: (sum(h), len(h)) for lv, h in by_level.items()}
+    total["details"] = details
     return total
 
 
@@ -358,20 +436,65 @@ def pct(hit: int, n: int) -> str:
     return f"{hit / n * 100:.0f}% ({hit}/{n})" if n else "—"
 
 
-def render_tables(summaries: list[tuple[dict, dict]]) -> str:
-    out = ["| 모델 | 성공 | 형식 오류 | API 오류 | 카테고리 정확도 | 주제어 재현율 | 입력 토큰 | 출력 토큰 | 비용(USD) | 50건 평균 지연(s) |",
-           "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+def render_tables(summaries: list[tuple[dict, dict]], config: dict) -> str:
+    out = ["## 전체", "",
+           "| 모델 | 성공 | 형식 오류 | API 오류 | 카테고리 정확도 | 주제어 재현율 | 두 번째 후보 | 입력 토큰 | 출력 토큰 | 비용(USD) | 평균 지연(s) |",
+           "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for model, s in summaries:
         cost = "단가 미확인" if s["cost_usd"] is None else f"{s['cost_usd']:.4f}"
         latency = f"{s['latency_s'] / s['n']:.1f}" if s["n"] else "—"
         out.append(f"| {model['id']} | {s['ok']}/{s['n']} | {s['format_errors']} | {s['api_errors']} | "
-                   f"{pct(s['cat_hit'], s['cat_n'])} | {pct(s['kw_hit'], s['kw_label'])} | "
+                   f"{pct(s['cat_hit'], s['cat_n'])} | {pct(s['kw_hit'], s['kw_label'])} | {pct(s['alt_n'], s['ok'])} | "
                    f"{s['input_tokens']} | {s['output_tokens']} | {cost} | {latency} |")
-    out += ["", "| 모델 | 자동 정리 | 부분 자동 | 링크 + 메모 |", "| --- | --- | --- | --- |"]
+
+    out += ["", "## 수집 수준별 카테고리 정확도", "", "| 모델 | " + " | ".join(LEVEL_NAMES.values()) + " |",
+            "| --- | --- | --- | --- |"]
     for model, s in summaries:
-        cells = [pct(*s["by_level"].get(lv, (0, 0))) for lv in ("auto", "partial", "memo")]
+        cells = [pct(*s["by_level"].get(lv, (0, 0))) for lv in LEVEL_NAMES]
         out.append(f"| {model['id']} | " + " | ".join(cells) + " |")
+
+    out += ["", "## 카테고리 × 필드 × 수집 수준",
+            "", "칸마다 추출률 / 정확도 / 헛채움률. 추출률·정확도는 정답이 있는 링크 기준, 헛채움률은 정답이 빈 링크 기준. "
+            "자유 텍스트 필드의 정확도는 공백·기호만 무시한 자동 비교라 review CSV로 사람이 확인한다.", "",
+            "| 모델 | 카테고리 | 필드 | " + " | ".join(LEVEL_NAMES.values()) + " |",
+            "| --- | --- | --- | --- | --- | --- |"]
+    for model, s in summaries:
+        for f in config["detail_fields"]:
+            cells = []
+            for lv in LEVEL_NAMES:
+                st = s["details"].get((f["category"], f["key"], lv))
+                if not st:
+                    cells.append("—")
+                    continue
+                cells.append(f"{pct(st['filled'], st['label_n'])} / {pct(st['correct'], st['label_n'])} / "
+                             f"{pct(st['false_fill'], st['empty_n'])}")
+            out.append(f"| {model['id']} | {f['category']} | {f['label']} | " + " | ".join(cells) + " |")
+
+    out += ["", "## 분류가 정답과 다른 사례", "",
+            "| 모델 | 링크 | 정답 | 모델 | 두 번째 후보 |", "| --- | --- | --- | --- | --- |"]
+    for model, s in summaries:
+        for lid, label, pred, alt in s["wrong"]:
+            out.append(f"| {model['id']} | {lid} | {label} | {pred} | {alt or '—'} |")
+        out.append(f"| {model['id']} | 합계 | 틀린 {len(s['wrong'])}건 중 두 번째 후보가 정답 {s['alt_rescue']}건 | | |")
     return "\n".join(out)
+
+
+def review_rows(links: dict[str, Link], rows: list[dict], config: dict) -> list[dict]:
+    """사람이 볼 표: 요약 점수 칸(빈 칸)과 자유 텍스트 필드의 정답·모델 값."""
+    text_keys = [f["key"] for f in config["detail_fields"] if f["kind"] == "text"]
+    result = []
+    for r in rows:
+        if "output" not in r:
+            continue
+        link, out = links[r["id"]], r["output"]
+        row = {"id": r["id"], "label_category": link.label_category, "category": out["category"],
+               "alt_category": out.get("alt_category", ""), "summary": out["summary"], "summary_score": "",
+               "keywords": "; ".join(out["keywords"])}
+        for k in text_keys:
+            row[f"label_{k}"] = link.label_details.get(k, "")
+            row[f"pred_{k}"] = out["details"].get(k, "")
+        result.append(row)
+    return result
 
 
 # ---------- 모델 호출 ----------
@@ -414,11 +537,11 @@ def call_model(model: dict, system: str, user: str, schema: dict) -> tuple[str, 
     raise ValueError(f"모르는 제공자: {provider}")
 
 
-def run_one(model: dict, item: dict, categories: list[dict], call=call_model) -> dict:
+def run_one(model: dict, item: dict, config: dict, call=call_model) -> dict:
     row = {"id": item["id"], "model": model["id"]}
     started = time.monotonic()
     try:
-        text, tin, tout = call(model, system_prompt(categories), user_prompt(item), output_schema(categories))
+        text, tin, tout = call(model, system_prompt(config), user_prompt(item), output_schema(config))
     except Exception as e:  # noqa: BLE001 - 한 건의 실패는 기록하고 다음으로 간다
         row.update(api_error=f"{type(e).__name__}: {e}", latency_s=time.monotonic() - started)
         return row
@@ -428,7 +551,7 @@ def run_one(model: dict, item: dict, categories: list[dict], call=call_model) ->
     except json.JSONDecodeError:
         row["format_error"] = "JSON 아님"
         return row
-    reason = validate_output(data, categories)
+    reason = validate_output(data, config)
     if reason:
         row["format_error"] = reason
     else:
@@ -477,7 +600,7 @@ def cmd_run(args, config) -> int:
         path = OUT_DIR / f"{model['id']}.jsonl"
         with path.open("w", encoding="utf-8") as f:
             for item in items:
-                row = run_one(model, item, config["categories"])
+                row = run_one(model, item, config)
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
                 print(f"{model['id']} {item['id']} {row.get('api_error') or row.get('format_error') or 'ok'}")
     return 0
@@ -491,11 +614,18 @@ def cmd_score(args, config) -> int:
         if not path.exists():
             continue
         rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        summaries.append((model, summarize(model, links, rows)))
+        summaries.append((model, summarize(model, links, rows, config)))
+        review = review_rows(links, rows, config)
+        if review:
+            with (OUT_DIR / f"review-{model['id']}.csv").open("w", encoding="utf-8", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=list(review[0]))
+                w.writeheader()
+                w.writerows(review)
     if not summaries:
         print("out/에 결과가 없다. 먼저 `python3 eval.py run`을 실행한다.")
         return 2
-    print(render_tables(summaries))
+    print(render_tables(summaries, config))
+    print("\n요약 점수(1~5)와 자유 텍스트 필드는 out/review-<모델>.csv에서 사람이 확인한다.")
     return 0
 
 

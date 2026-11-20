@@ -1,51 +1,51 @@
-id,platform,url,title,suggested_category,memo,label_category,label_keywords,note
-L01,youtube,https://www.youtube.com/watch?v=DnQ09ZZCjCs,초간단 김치찌개 ㅣ 백종원의 백종원 레시피,맛집·음식,,,,
-L02,youtube,https://www.youtube.com/watch?v=GT2OUZ4pPAE,한국관광공사 추천 대한민국 구석구석 1박2일 여행지,여행·장소,,,,
-L03,youtube,https://www.youtube.com/watch?v=tZooW6PritE,WEB1 - 1.수업소개 (생활코딩),공부·커리어,,,,
-L04,youtube,https://www.youtube.com/watch?v=VNQpP6C1fJg,집에서 하는 유산소운동 다이어트 [칼소폭] (땅끄부부),건강·운동,,,,
-L05,youtube,https://www.youtube.com/watch?v=tEasZoCCQBs,«서도호» 국립현대미술관 큐레이터 전시투어,문화·엔터,,,,
-L06,youtube,https://www.youtube.com/watch?v=P1fmiH1yznQ,땅 하나에 집 3개 지어 각자 살았더니 생긴 일｜건축탐구 집 (EBS),문화·엔터,,,,카테고리 애매: 문화·엔터 / 디자인·영감
-L07,youtube,https://www.youtube.com/watch?v=x8taQUzdHO4,[#간식게임] 줄임말 퀴즈 | 놀라운 토요일 EP.442,문화·엔터,,,,
-L08,youtube,https://www.youtube.com/watch?v=dEEfvsFC5F8,가을에 입어야 제맛! 두 가지 분위기의 체크 스타일링 (ELLE KOREA),쇼핑·패션,,,,
-L09,youtube,https://www.youtube.com/watch?v=5lX19wMSr8w,"연말정산, 자주 발생하는 실수 TOP4! (국세청)",생활·정보,,,,
-L10,youtube,https://www.youtube.com/watch?v=aE-zl1rl-Vc,경제 운명을 건 초거대 투자에 나서는 대한민국 (슈카월드),공부·커리어,,,,
-L11,naver_blog,https://blog.naver.com/korea_diary/224474498213,[11월 여행지 추천] 춘천 반나절 여행 코스 (한국관광공사),여행·장소,,,,
-L12,naver_blog,https://blog.naver.com/haechiseoul/224484728489,'서울 명소 3D 디지털 애셋' 무료 배포 (서울시),디자인·영감,,,,
-L13,naver_blog,https://blog.naver.com/molab_suda/224484544254,"딱딱한 정책은 이제 그만, 친근하게 만나는 청년고용정책 (고용노동부)",공부·커리어,,,,
-L14,naver_blog,https://blog.naver.com/hellopolicy/224483719898,겨울철 복지 혜택도 '복지멤버십'이 먼저 알려드려요 (정부 블로그),생활·정보,,,,
-L15,naver_blog,https://blog.naver.com/kfdazzang/224483133906,"겨울철 간식, 어묵 알아보기 (식약처)",맛집·음식,,,,
-L16,news,https://www.segye.com/newsView/20261014505236,찬바람 불자 굴국밥·굴칼국수 돌아왔다…외식업계 겨울 메뉴 경쟁,맛집·음식,,,,
-L17,news,https://kormedi.com/2902925/,추워서 밖에 못 나간다면?⋯집에서 살 빼고 근육 만드는 운동 4가지,건강·운동,,,,
-L18,news,https://www.korea.kr/news/policyNewsView.do?newsId=148974171,"13월의 월급, 나는 얼마나 받을까? (정책브리핑)",생활·정보,,,,
-L19,news,https://www.vogue.co.kr/?p=888622,"올겨울, 코트와 패딩 대신 입기 좋은 아우터 4",쇼핑·패션,,,,
-L20,blog,https://toss.tech/article/bankbook_graphic,디자인 시스템 만들던 디자이너가 3D 그래픽을 그린다면,디자인·영감,,,,
-L21,blog,https://techblog.woowahan.com/28524/,이래라저래라 하지 마라: 주니어를 성장시키는 파트너십 대화법,공부·커리어,,,,
-L22,blog,https://brunch.co.kr/@hk6879/92,교토에서는 커피가 단품이 아니다,여행·장소,,,,개인 작가 글(공개 플랫폼)
-L23,notion,https://tosspublic.notion.site/75f32c870eee434b8768215efe9c976b,토스 인터랙션 디자이너의 모든 것,디자인·영감,,,,노션: JS 렌더링이라 본문이 비어 올 수 있음
-L24,notion,https://hufs-gourmet-map.notion.site/,외대 맛집 지도,맛집·음식,,,,"노션, 운영 주체 불명확"
-L25,notion,https://fast-havarti-c29.notion.site/3997e11133d447b3ba8272011d4bb9ec,손바닥 위의 여행가이드 (홍콩 3박 4일),여행·장소,,,,"노션, 운영 주체 불명확"
-L26,notion,https://swagkeys.notion.site/QK65-MK3-2f8f75d5360180b9a667ccd8a81612c9,QK65 MK3 빌드 가이드 (Swagkeys),쇼핑·패션,,,,카테고리 애매: 쇼핑·패션 / 생활·정보
-L27,notion,https://mo-ai.notion.site/AI-100-f2ba9625939c4a9bbc4835393699f01d,[모두의AI] 업무별 프롬프트 예시 100,공부·커리어,,,,"노션, 운영 주체 불명확"
-L28,notion,https://ssul.notion.site/30-3212b45004ae460a8b7c95ac674830aa,청소년 30일 습관챌린지,건강·운동,,,,"노션, 운영 주체 불명확"
-L29,x,https://x.com/StarbucksKorea/status/1937012743044821272,스타벅스 코리아: 밀크 카라멜 라떼 출시,맛집·음식,,,,
-L30,x,https://x.com/The_NMK/status/2021902100788027845,"국립중앙박물관, 대동여지도를 펼치다!",문화·엔터,,,,
-L31,x,https://x.com/kma_skylove/status/2106523230907650312,기상청 예보관 리포트 (2026.10.4.),생활·정보,,,,
-L32,x,https://x.com/Kor_Visitkorea/status/1931984816452628644,한국관광공사: 나만 알고 싶은 숨은 힐링 여행지,여행·장소,,,,
-L33,x,https://x.com/mcstkorea/status/1247029619422662656,문화체육관광부: 국가대표 선수들과 국민체조,건강·운동,,,,2020년 글
-L34,x,https://x.com/googlekorea/status/1904360334229737680,Google Korea: 구글 포 스타트업 액셀러레이터 AI 퍼스트 11개사 선정,공부·커리어,,,,
-L35,pinterest,https://www.pinterest.com/pin/636203884945082472/,The modern minimalist interior design of this small living room,디자인·영감,,,,"일반 크리에이터 핀, 영어"
-L36,pinterest,https://www.pinterest.com/pin/kimchi-fried-rice-recipe--398146423279562352/,Kimchi Fried Rice Recipe: 김치볶음밥,맛집·음식,,,,외부 레시피로 연결되는 핀일 수 있음
-L37,pinterest,https://kr.pinterest.com/pin/275845545923386094/,26 Unique and Unusual Things to Do in Seoul,여행·장소,,,,"일반 크리에이터 핀, 영어"
-L38,pinterest,https://www.pinterest.com/pin/985231165295974/,At-Home Bodyweight Workout for Beginners,건강·운동,,,,"일반 크리에이터 핀, 영상, 영어"
-L39,pinterest,https://www.pinterest.com/pin/20-cool-winter-outfits-for-street-style--725501821211923532/,20 Cool Winter Outfits for Street Style,쇼핑·패션,,,,"일반 크리에이터 핀, 영어"
-L40,instagram,https://www.instagram.com/p/DfHGZrxNXpb/,대한민국 정부: 2026 여행가는 가을 (댓글 이벤트),여행·장소,,,,댓글 이벤트 홍보 글
-L41,instagram,https://www.instagram.com/p/Dev_YljtfQR/,"대한민국 정부: 가을 산행, 이것만은 꼭!",건강·운동,,,,
-L42,instagram,https://www.instagram.com/reel/Dfl3mAlDh2h/,행정안전부: 혜택알리미 퀴즈 이벤트,생활·정보,,,,퀴즈 이벤트 홍보 글
-L43,instagram,https://www.instagram.com/p/CFq-gXBn_OS/,국립현대미술관: 추석 온라인 전시투어 이벤트 (2020),문화·엔터,,,,2020년 이벤트 글
-L44,instagram,https://www.instagram.com/p/Df3EHpaEhGP/,올리브영: 컬러그라운드 홍대 그랜드 오픈,쇼핑·패션,,,,
-L45,instagram,https://www.instagram.com/p/Df9SPY2IJYI/,무신사: 무진장 26 겨울 블랙프라이데이 위클리 뉴스,쇼핑·패션,,,,
-L46,shop,https://www.musinsa.com/products/1618313,무신사 스탠다드 캐시미어 블렌드 대디 숄더 싱글 롱 코트 [블랙],쇼핑·패션,,,,"자동 접속 차단(403), 검색 결과로만 확인"
-L47,shop,https://www.29cm.co.kr/products/1291144,오브제 벌룬 도자기 머그컵 3color 220ml,디자인·영감,,,,카테고리 애매: 디자인·영감 / 쇼핑·패션
-L48,shop,https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo=A000000149135,라운드랩 자작나무 수분 선크림 50ml 기획(+크림 20ml),쇼핑·패션,,,,"자동 접속 차단(403), 검색 결과로만 확인"
-L49,shop,https://www.coupang.com/vp/products/7821085725,BBT KC인증 운동매트 두꺼운 홈트 요가 매트 뉴 리쌤매트,건강·운동,,,,"자동 접속 차단(403), 검색 결과로만 확인"
-L50,shop,https://www.kurly.com/goods/1000360724,[매일식탁] 의정부식 부대찌개 (2인),맛집·음식,,,,
+id,platform,url,title,suggested_category,memo,label_category,label_keywords,label_place_name,label_location,label_place_type,label_product_name,label_product_type,label_brand,label_usage_type,label_material_type,label_content_type,label_reference_type,label_benefit_name,label_benefit_type,label_valid_until,note
+L01,youtube,https://www.youtube.com/watch?v=DnQ09ZZCjCs,초간단 김치찌개 ㅣ 백종원의 백종원 레시피,레시피·생활,,,,,,,,,,,,,,,,,
+L02,youtube,https://www.youtube.com/watch?v=GT2OUZ4pPAE,한국관광공사 추천 대한민국 구석구석 1박2일 여행지,맛집·장소,,,,,,,,,,,,,,,,,
+L03,youtube,https://www.youtube.com/watch?v=tZooW6PritE,WEB1 - 1.수업소개 (생활코딩),업무·학습,,,,,,,,,,,,,,,,,
+L04,youtube,https://www.youtube.com/watch?v=VNQpP6C1fJg,집에서 하는 유산소운동 다이어트 [칼소폭] (땅끄부부),레시피·생활,,,,,,,,,,,,,,,,,
+L05,youtube,https://www.youtube.com/watch?v=tEasZoCCQBs,«서도호» 국립현대미술관 큐레이터 전시투어,콘텐츠·아티클,,,,,,,,,,,,,,,,,
+L06,youtube,https://www.youtube.com/watch?v=P1fmiH1yznQ,땅 하나에 집 3개 지어 각자 살았더니 생긴 일｜건축탐구 집 (EBS),콘텐츠·아티클,,,,,,,,,,,,,,,,,카테고리 애매: 문화·엔터 / 디자인·영감; 분류 애매: 디자인·아이디어와 걸침
+L07,youtube,https://www.youtube.com/watch?v=uxubmeGu2zY,주말 최저기온은 몇도? 🥶 주말 및 다음 주 날씨 전망ㅣ11월 19일(목) 기상청 정례 예보 브리핑,기타,,,,,,,,,,,,,,,,,기상청 공식 채널
+L08,youtube,https://www.youtube.com/watch?v=dEEfvsFC5F8,가을에 입어야 제맛! 두 가지 분위기의 체크 스타일링 (ELLE KOREA),콘텐츠·아티클,,,,,,,,,,,,,,,,,분류 애매: 제품·쇼핑와 걸침
+L09,youtube,https://www.youtube.com/watch?v=5lX19wMSr8w,"연말정산, 자주 발생하는 실수 TOP4! (국세청)",업무·학습,,,,,,,,,,,,,,,,,분류 애매: 콘텐츠·아티클와 걸침
+L10,youtube,https://www.youtube.com/watch?v=aE-zl1rl-Vc,경제 운명을 건 초거대 투자에 나서는 대한민국 (슈카월드),콘텐츠·아티클,,,,,,,,,,,,,,,,,
+L11,naver_blog,https://blog.naver.com/korea_diary/224474498213,[11월 여행지 추천] 춘천 반나절 여행 코스 (한국관광공사),맛집·장소,,,,,,,,,,,,,,,,,
+L12,naver_blog,https://blog.naver.com/haechiseoul/224484728489,'서울 명소 3D 디지털 애셋' 무료 배포 (서울시),디자인·아이디어,,,,,,,,,,,,,,,,,
+L13,naver_blog,https://blog.naver.com/molab_suda/224484544254,"딱딱한 정책은 이제 그만, 친근하게 만나는 청년고용정책 (고용노동부)",콘텐츠·아티클,,,,,,,,,,,,,,,,,
+L14,naver_blog,https://blog.naver.com/cjcheiljedang/224435167128,"CJ제일제당, CJ더마켓서 가을 맞이 ‘더세페’ 할인 행사… 최대 75% 할인",쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,CJ제일제당 공식 블로그. 쿠폰이 아니라 할인 행사 글; 분류 애매: 제품·쇼핑와 걸침
+L15,naver_blog,https://blog.naver.com/kfdazzang/224483133906,"겨울철 간식, 어묵 알아보기 (식약처)",레시피·생활,,,,,,,,,,,,,,,,,
+L16,news,https://www.segye.com/newsView/20261014505236,찬바람 불자 굴국밥·굴칼국수 돌아왔다…외식업계 겨울 메뉴 경쟁,콘텐츠·아티클,,,,,,,,,,,,,,,,,분류 애매: 맛집·장소와 걸침
+L17,news,https://kormedi.com/2902925/,추워서 밖에 못 나간다면?⋯집에서 살 빼고 근육 만드는 운동 4가지,레시피·생활,,,,,,,,,,,,,,,,,
+L18,news,https://www.yna.co.kr/view/AKR20261120161400004,[날씨] 토요일 전국 영하권 추위 계속…새벽 전라권 강한 눈,기타,,,,,,,,,,,,,,,,,연합뉴스 날씨 기사
+L19,news,https://www.vogue.co.kr/?p=888622,"올겨울, 코트와 패딩 대신 입기 좋은 아우터 4",콘텐츠·아티클,,,,,,,,,,,,,,,,,분류 애매: 제품·쇼핑와 걸침
+L20,blog,https://toss.tech/article/bankbook_graphic,디자인 시스템 만들던 디자이너가 3D 그래픽을 그린다면,디자인·아이디어,,,,,,,,,,,,,,,,,
+L21,blog,https://toss.tech/article/milvus-optimization-and-sizing,"CPU 뼛속까지 써먹고, Milvus 사이징 기준을 만들기까지",업무·학습,,,,,,,,,,,,,,,,,"토스 기술 블로그, 봇 UA로 본문 확인"
+L22,blog,https://brunch.co.kr/@hk6879/92,교토에서는 커피가 단품이 아니다,콘텐츠·아티클,,,,,,,,,,,,,,,,,개인 작가 글(공개 플랫폼); 분류 애매: 맛집·장소와 걸침
+L23,notion,https://tosspublic.notion.site/75f32c870eee434b8768215efe9c976b,토스 인터랙션 디자이너의 모든 것,디자인·아이디어,,,,,,,,,,,,,,,,,노션: JS 렌더링이라 본문이 비어 올 수 있음; 분류 애매: 업무·학습와 걸침
+L24,notion,https://hufs-gourmet-map.notion.site/,외대 맛집 지도,맛집·장소,,,,,,,,,,,,,,,,,"노션, 운영 주체 불명확"
+L25,notion,https://fast-havarti-c29.notion.site/3997e11133d447b3ba8272011d4bb9ec,손바닥 위의 여행가이드 (홍콩 3박 4일),맛집·장소,,,,,,,,,,,,,,,,,"노션, 운영 주체 불명확"
+L26,notion,https://swagkeys.notion.site/QK65-MK3-2f8f75d5360180b9a667ccd8a81612c9,QK65 MK3 빌드 가이드 (Swagkeys),업무·학습,,,,,,,,,,,,,,,,,카테고리 애매: 쇼핑·패션 / 생활·정보; 분류 애매: 제품·쇼핑와 걸침
+L27,notion,https://mo-ai.notion.site/AI-100-f2ba9625939c4a9bbc4835393699f01d,[모두의AI] 업무별 프롬프트 예시 100,업무·학습,,,,,,,,,,,,,,,,,"노션, 운영 주체 불명확"
+L28,notion,https://ssul.notion.site/30-3212b45004ae460a8b7c95ac674830aa,청소년 30일 습관챌린지,기타,,,,,,,,,,,,,,,,,"노션, 운영 주체 불명확; 분류 애매: 레시피·생활와 걸침"
+L29,x,https://x.com/StarbucksKorea/status/1937012743044821272,스타벅스 코리아: 밀크 카라멜 라떼 출시,제품·쇼핑,,,,,,,,,,,,,,,,,
+L30,x,https://x.com/The_NMK/status/2021902100788027845,"국립중앙박물관, 대동여지도를 펼치다!",콘텐츠·아티클,,,,,,,,,,,,,,,,,
+L31,x,https://x.com/kma_skylove/status/2106523230907650312,기상청 예보관 리포트 (2026.10.4.),기타,,,,,,,,,,,,,,,,,
+L32,x,https://x.com/Kor_Visitkorea/status/1931984816452628644,한국관광공사: 나만 알고 싶은 숨은 힐링 여행지,맛집·장소,,,,,,,,,,,,,,,,,
+L33,x,https://x.com/mcstkorea/status/1247029619422662656,문화체육관광부: 국가대표 선수들과 국민체조,레시피·생활,,,,,,,,,,,,,,,,,2020년 글
+L34,x,https://x.com/kakaotalkgift/status/2063848497351123168,#EVENT 선물하기에서 최대 90% 쿠폰을 준다고요 ..?! (포미위크 랜덤 할인쿠폰 RT 이벤트),쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,"카카오톡 선물하기 공식 계정, 2026-06 종료된 이벤트. X oEmbed 응답 없음(제3자 경로로 확인)"
+L35,pinterest,https://www.pinterest.com/pin/256283035040948089/,A Brooklyn Townhouse Celebrates a Forgotten Design Pioneer,디자인·아이디어,,,,,,,,,,,,,,,,,Architectural Digest 핀
+L36,pinterest,https://www.pinterest.com/pin/56365432834688316/,"Isern Serra – Circl fitness studio and matcha cafe, Barcelona (Dezeen)",디자인·아이디어,,,,,,,,,,,,,,,,,"Dezeen 핀, 인스타그램으로 연결됨"
+L37,pinterest,https://www.pinterest.com/pin/97601516922369572/,Laneige Turns Skincare Customization Into a Four-Story Experience,디자인·아이디어,,,,,,,,,,,,,,,,,Design Milk 핀
+L38,pinterest,https://www.pinterest.com/pin/4601201155720153664/,Made In Stainless Clad 12,제품·쇼핑,,,,,,,,,,,,,,,,,Crate and Barrel 핀
+L39,pinterest,https://www.pinterest.com/pin/130534089199446528/,The best restaurants in Berlin you should be booking in 2025,맛집·장소,,,,,,,,,,,,,,,,,"Time Out 핀, 제목은 목록인데 설명은 식당 하나"
+L40,instagram,https://www.instagram.com/p/DfHGZrxNXpb/,대한민국 정부: 2026 여행가는 가을 (댓글 이벤트),쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,댓글 이벤트 홍보 글; 분류 애매: 맛집·장소와 걸침
+L41,instagram,https://www.instagram.com/p/Dev_YljtfQR/,"대한민국 정부: 가을 산행, 이것만은 꼭!",레시피·생활,,,,,,,,,,,,,,,,,
+L42,instagram,https://www.instagram.com/reel/Dfl3mAlDh2h/,행정안전부: 혜택알리미 퀴즈 이벤트,쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,퀴즈 이벤트 홍보 글
+L43,instagram,https://www.instagram.com/p/CFq-gXBn_OS/,국립현대미술관: 추석 온라인 전시투어 이벤트 (2020),쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,2020년 이벤트 글; 분류 애매: 콘텐츠·아티클와 걸침
+L44,instagram,https://www.instagram.com/p/Df3EHpaEhGP/,올리브영: 컬러그라운드 홍대 그랜드 오픈,맛집·장소,,,,,,,,,,,,,,,,,분류 애매: 제품·쇼핑와 걸침
+L45,instagram,https://www.instagram.com/p/Df9SPY2IJYI/,무신사: 무진장 26 겨울 블랙프라이데이 위클리 뉴스,쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,분류 애매: 제품·쇼핑와 걸침
+L46,shop,https://www.musinsa.com/products/1618313,무신사 스탠다드 캐시미어 블렌드 대디 숄더 싱글 롱 코트 [블랙],제품·쇼핑,,,,,,,,,,,,,,,,,"자동 접속 차단(403), 검색 결과로만 확인"
+L47,shop,https://www.29cm.co.kr/products/1291144,오브제 벌룬 도자기 머그컵 3color 220ml,제품·쇼핑,,,,,,,,,,,,,,,,,카테고리 애매: 디자인·영감 / 쇼핑·패션; 분류 애매: 디자인·아이디어와 걸침
+L48,shop,https://gift.kakao.com/product/3818654,아이스 카페 아메리카노 T,쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,카카오 선물하기. 브랜드는 정적 HTML에 없음
+L49,shop,https://ticket.yes24.com/Perf/60484,식스 더 뮤지컬(SIX THE MUSICAL),쿠폰·티켓·기프티콘,,,,,,,,,,,,,,,,,"YES24 티켓, 봇 차단이 간헐적으로 걸림"
+L50,shop,https://www.kurly.com/goods/1000360724,[매일식탁] 의정부식 부대찌개 (2인),제품·쇼핑,,,,,,,,,,,,,,,,,

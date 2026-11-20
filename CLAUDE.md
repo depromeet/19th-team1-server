@@ -55,6 +55,7 @@ docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
 ## 작업 규칙
 
 - **일감**: 일감은 [docs/plan/roadmap.md](docs/plan/roadmap.md)의 "진행 방법"에 따라 고르고 진행한다. 작업 계획은 스토리 파일의 세부 작업에 쓰고, 계획 파일을 따로 만들지 않는다.
+- **레포 스킬**: 일감을 시작할 때 `next-story`, 팀 결정이 바뀌었을 때 `plan-sync`, PR을 올리기 전에 `doc-check`를 쓴다. 구현은 Superpowers 플러그인의 흐름(계획 → TDD → 완료 전 검증 → 리뷰)을 따른다. 레포 설정은 플러그인을 켜기만 하므로, 설치돼 있지 않으면 `claude plugin install superpowers@claude-plugins-official --scope project`로 설치한다.
 - **범위**: 이슈에 적힌 범위만 작업한다. 다음 이슈에서 필요할 것 같은 코드를 미리 만들지 않는다.
 - **구조**: `.claude/rules/architecture.md`를 따른다. 규칙과 어긋나는 변경이 필요하면 구현하기 전에 사람에게 확인하고, 합의되면 규칙 파일과 문서를 같은 PR에서 고친다.
 - **테스트**: 기능과 테스트를 같은 PR에 넣는다. 버그 수정에는 그 버그를 재현하는 테스트를 추가한다. 실패한 테스트를 통과시키려고 단언을 약하게 고치거나, 테스트를 지우거나 비활성화하지 않는다. 테스트가 틀렸다면 이유를 PR에 적고 고친다.

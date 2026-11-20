@@ -12,8 +12,9 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 | 기능 브랜치 푸시 | 영향받는 모듈의 테스트 | 없음 |
 | 수동 실행 | 전체 | 없음 |
 
-- 브랜치 보호의 필수 검사는 CI 워크플로의 `ci-result`와 Convention 워크플로의 `convention`이다. `ci-result`는 CI의 검사 잡 결과를 모은 잡이다. 검사 잡을 추가하면 이 잡의 `needs`에 더한다.
+- 브랜치 보호의 필수 검사는 CI 워크플로의 `ci-result`와 Convention 워크플로의 `convention`이다. `ci-result`는 CI의 검사 잡(`test`, `docs`) 결과를 모은 잡이다. 검사 잡을 추가하면 이 잡의 `needs`에 더한다.
 - `ci-result`라는 이름은 `main` 대상 PR 실행(전체 테스트)에만 붙는다. 브랜치 푸시 실행은 `ci-result (push)`로 남아 필수 검사가 아니다. 같은 커밋에 두 실행이 같은 이름을 남기면 GitHub이 어느 결과로 머지를 허락할지 문서에 정해져 있지 않기 때문이다.
+- `docs` 잡은 이벤트와 바뀐 파일에 관계없이 항상 돈다. 문서 검사(`scripts/check-docs.sh`)와 Gradle 밖의 스크립트 테스트(`scripts/test-check-docs.sh`, `scripts/claude/test-next-story.sh`)다. PR 본문 검사는 본문을 고칠 때도 다시 돌아야 해서 Convention 워크플로에 있다.
 - PR이 열린 기능 브랜치에 푸시하면 선택 실행(푸시)과 전체 실행(PR)이 함께 돈다. 선택 실행은 빠른 확인, 전체 실행은 머지 관문이다.
 
 ## 2. 영향받는 테스트 고르기
@@ -32,6 +33,7 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 
 | 바뀐 파일 | 돌리는 테스트 |
 | --- | --- |
+| `scripts/check-docs.sh`, `scripts/test-check-docs.sh`, `scripts/claude/**` | Gradle 테스트 없음. `docs` 잡이 항상 테스트한다 |
 | 루트 빌드 파일, `gradle/**`, `gradle.properties`, `gradlew*`, `.github/workflows/**`, `scripts/ci/**` | 전체 |
 | 모듈 안의 파일 (코드, 테스트, 리소스, 마이그레이션, 모듈의 `build.gradle.kts`, `.md`를 포함한 모든 파일) | 그 모듈과 그 모듈에 의존하는 모듈 |
 | 모듈 밖의 `*.md`, `docs/**`, `.claude/**`, `.github/ISSUE_TEMPLATE/**`, `compose.yaml`, `.env.example`, `Dockerfile`, `.dockerignore`, `.editorconfig`, `.gitignore`, `.gitattributes`, `scripts/git-hooks/**`, `scripts/check-convention.sh` | 없음 |

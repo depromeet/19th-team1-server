@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# 푸시하기 전에 문서 검사(scripts/check-docs.sh)를 돌린다. 실패하면 푸시하지 않는다.
+# ./gradlew 로 처음 빌드할 때 .git/hooks 에 자동으로 설치된다. 급할 때는 git push --no-verify 로 건너뛸 수 있지만 CI 에서 같은 검사가 돈다.
+exec "$(git rev-parse --show-toplevel)/scripts/check-docs.sh"

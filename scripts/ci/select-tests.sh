@@ -49,6 +49,8 @@ affects_whole_build() {
 # 모듈 밖에서 테스트 결과에 영향이 없는 파일. 포맷 검사는 선택과 관계없이 모든 모듈에 돈다.
 is_ignored() {
   case "$1" in
+    # Gradle 밖의 스크립트. CI 의 docs 잡이 바뀐 파일과 관계없이 테스트한다.
+    scripts/check-docs.sh | scripts/test-check-docs.sh | scripts/claude/*) return 0 ;;
     *.md | docs/* | .claude/* | .github/ISSUE_TEMPLATE/* | scripts/git-hooks/*) return 0 ;;
     compose.yaml | .env.example | Dockerfile | .dockerignore | .editorconfig | .gitignore | .gitattributes) return 0 ;;
     scripts/check-convention.sh) return 0 ;;

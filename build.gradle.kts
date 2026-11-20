@@ -12,10 +12,11 @@ plugins {
 // git 훅을 로컬에서 처음 빌드할 때 설치한다. CI 와 .git 이 없는 곳(Docker 빌드 등)에서는 설치하지 않는다.
 //   - pre-commit: 스테이지된 Kotlin 파일을 자동으로 포맷한다 (ktlint 플러그인 제공)
 //   - commit-msg: 커밋 메시지 규칙을 검사하고 브랜치의 이슈 번호를 붙인다 (scripts/git-hooks/commit-msg)
+//   - pre-push: 문서 검사(scripts/check-docs.sh)를 돌린다 (scripts/git-hooks/pre-push)
 val installGitHook = rootProject.file(".git").isDirectory && System.getenv("CI") == null
 
-val installCommitMsgHook by tasks.registering(Copy::class) {
-    from("scripts/git-hooks/commit-msg")
+val installRepoGitHooks by tasks.registering(Copy::class) {
+    from("scripts/git-hooks")
     into(".git/hooks")
     filePermissions { unix("rwxr-xr-x") }
 }
@@ -75,7 +76,7 @@ subprojects {
     if (installGitHook) {
         tasks.matching { it.name == "compileKotlin" }.configureEach {
             dependsOn(rootProject.tasks.named("addKtlintFormatGitPreCommitHook"))
-            dependsOn(installCommitMsgHook)
+            dependsOn(installRepoGitHooks)
         }
     }
 

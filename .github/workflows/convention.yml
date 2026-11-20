@@ -38,3 +38,8 @@ jobs:
             scripts/check-convention.sh message "$subject" || fail=1
           done < <(git log --format=%s "$BASE..$HEAD")
           exit "$fail"
+      # PR 본문의 Closes·Refs, 닫는 이슈의 스토리 파일이 지워졌는지. 본문을 고쳐도(edited) 다시 돈다.
+      - name: PR 본문
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: scripts/check-docs.sh pr

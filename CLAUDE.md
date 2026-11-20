@@ -43,7 +43,7 @@ docker compose up -d            # 로컬 PostgreSQL (처음엔 cp .env.example .
 ./gradlew :core:test --tests "com.depromeet.team1.core.SomeTest"   # 테스트 클래스 하나
 ```
 
-- 모듈: `core`(도메인·서비스·경계 인터페이스), `infra`(DB·외부 연동 구현), `api`(컨트롤러, 실행 모듈), `worker`(작업 폴링·스케줄러)
+- 모듈: `core`(도메인·서비스·경계 인터페이스), `infra`(DB·외부 연동 구현), `api`(컨트롤러, 실행 모듈), `worker`(작업 큐 수신·스케줄러)
 - 버전은 `gradle/libs.versions.toml`에서, 라이브러리 버전은 Spring Boot BOM에서 관리한다. 모듈의 `build.gradle.kts`에는 버전을 적지 않는다.
 
 ## 코드 스타일

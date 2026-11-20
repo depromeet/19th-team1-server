@@ -24,7 +24,12 @@ interface ProcessingJobRepository {
      */
     fun start(id: Long, staleBefore: Instant, now: Instant): Int?
 
-    /** 전이 4(RUNNING → DONE). [attempt] 가 차례 번호와 같을 때만. */
+    /**
+     * 전이 4(RUNNING → DONE). [attempt] 가 차례 번호와 같을 때만.
+     *
+     * 결과 저장, EMBED 작업 생성, 저장물 화면 상태(DONE)와 한 트랜잭션으로 묶어야 한다. 저장소 메서드는 각자 커밋하므로
+     * 외부 호출(수집·LLM)이 끝난 뒤 이 저장들만 하는 별도 서비스 메서드에 `@Transactional` 을 붙여 묶는다.
+     */
     fun complete(id: Long, attempt: Int, now: Instant): Int
 
     /** 전이 5(RUNNING → QUEUED). 재시도할 수 있는 실패. 메시지를 지우지 않아 SQS 가 다시 보낸다. */

@@ -30,6 +30,7 @@
 | [docs/conventions.md](docs/conventions.md) | 브랜치·커밋·PR 규칙. 커밋하거나 PR을 만들 때 읽는다 |
 | [docs/deployment.md](docs/deployment.md) | 빌드·실행 전제, 이미지, 프로필, 환경변수 목록. 설정을 바꿀 때 읽는다 |
 | [docs/ci.md](docs/ci.md) | CI 실행 범위, 영향받는 테스트를 고르는 규칙, 이미지를 새로 만드는 조건과 그 이유. CI·`scripts/ci/`를 바꿀 때 읽는다 |
+| [docs/plan/](docs/plan/roadmap.md) | 프리런칭 범위(`scope.md`), 에픽·스토리 순서와 진행 방법(`roadmap.md`), 진행 중인 스토리의 세부 작업(`stories/`). 일감을 고르거나 시작할 때 읽는다 |
 
 ## 빌드·실행
 
@@ -53,6 +54,7 @@ docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
 
 ## 작업 규칙
 
+- **일감**: 일감은 [docs/plan/roadmap.md](docs/plan/roadmap.md)의 "진행 방법"에 따라 고르고 진행한다. 작업 계획은 스토리 파일의 세부 작업에 쓰고, 계획 파일을 따로 만들지 않는다.
 - **범위**: 이슈에 적힌 범위만 작업한다. 다음 이슈에서 필요할 것 같은 코드를 미리 만들지 않는다.
 - **구조**: `.claude/rules/architecture.md`를 따른다. 규칙과 어긋나는 변경이 필요하면 구현하기 전에 사람에게 확인하고, 합의되면 규칙 파일과 문서를 같은 PR에서 고친다.
 - **테스트**: 기능과 테스트를 같은 PR에 넣는다. 버그 수정에는 그 버그를 재현하는 테스트를 추가한다. 실패한 테스트를 통과시키려고 단언을 약하게 고치거나, 테스트를 지우거나 비활성화하지 않는다. 테스트가 틀렸다면 이유를 PR에 적고 고친다.

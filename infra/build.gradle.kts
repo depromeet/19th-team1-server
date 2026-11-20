@@ -4,6 +4,8 @@ import org.springframework.boot.gradle.plugin.SpringBootPlugin
 plugins {
     // src/testFixtures 의 테스트 도구를 다른 모듈의 테스트에서 쓸 수 있게 한다.
     `java-test-fixtures`
+    // JPA 엔티티에 Hibernate 가 쓰는 인자 없는 생성자를 만든다.
+    alias(libs.plugins.kotlin.jpa)
 }
 
 dependencies {
@@ -16,6 +18,7 @@ dependencies {
 
     testFixturesImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
     testFixturesImplementation("org.springframework.boot:spring-boot-test")
+    testFixturesImplementation("org.springframework:spring-jdbc")
     testFixturesApi("org.springframework.boot:spring-boot-testcontainers")
     testFixturesApi("org.testcontainers:testcontainers-postgresql")
 }

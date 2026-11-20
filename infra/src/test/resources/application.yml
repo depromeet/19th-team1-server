@@ -1,0 +1,13 @@
+# infra 저장소 테스트 설정. 접속 정보는 PostgreSqlContainerConfiguration 이 넣는다.
+# JPA 설정은 api 의 application.yml 과 같게 둔다.
+spring:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    locations: classpath:db/migration

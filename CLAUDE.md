@@ -31,6 +31,7 @@
 | [docs/deployment.md](docs/deployment.md) | 빌드·실행 전제, 이미지, 프로필, 환경변수 목록. 설정을 바꿀 때 읽는다 |
 | [docs/ci.md](docs/ci.md) | CI 실행 범위, 영향받는 테스트를 고르는 규칙, 이미지를 새로 만드는 조건과 그 이유. CI·`scripts/ci/`를 바꿀 때 읽는다 |
 | [docs/plan/](docs/plan/roadmap.md) | 프리런칭 범위(`scope.md`), 에픽·스토리 순서와 진행 방법(`roadmap.md`), 진행 중인 스토리의 세부 작업(`stories/`). 일감을 고르거나 시작할 때 읽는다 |
+| [docs/metrics.md](docs/metrics.md) | 프리런칭 지표, 지표에 쓰는 이벤트와 속성, 기록 위치. 이벤트를 기록하거나 지표를 바꿀 때 읽는다 |
 
 ## 빌드·실행
 

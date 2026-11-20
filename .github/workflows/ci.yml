@@ -1,10 +1,15 @@
 name: CI
 
+# 테스트 범위 (규칙과 이유: docs/ci.md)
+#   - main 대상 PR, main 푸시, 수동 실행: 전체 테스트
+#   - 그 밖의 브랜치 푸시(기능 브랜치, develop): 바뀐 모듈과 그 모듈에 의존하는 모듈의 테스트. 구조 테스트는 항상
+# 이미지: develop·main 에 푸시되고 테스트를 통과하면 GHCR 에 올린다. 같은 jar 면 새로 만들지 않고 태그만 옮긴다.
 on:
   pull_request:
     branches: [main]
   push:
-    branches: [develop]
+    branches: ["**"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,8 +20,61 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # develop 의 테스트 선택이 마지막으로 성공한 실행을 조회한다.
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # 테스트 선택이 base 커밋과 비교해 바뀐 파일을 찾는다.
+          fetch-depth: 0
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: 실행 범위 결정
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          if [[ "$EVENT" == "pull_request" || "$EVENT" == "workflow_dispatch" || "$REF" == "refs/heads/main" ]]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 포맷 검사(ktlintCheck), 테스트(Testcontainers MySQL), build-logic 테스트를 포함한다.
+      - name: 전체 테스트
+        if: steps.scope.outputs.full == 'true'
+        run: ./gradlew build
+
+      - name: 테스트 선택
+        if: steps.scope.outputs.full != 'true'
+        env:
+          BRANCH: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/ci/select-tests.sh
+          cat build/ci/selection.md >> "$GITHUB_STEP_SUMMARY"
+
+      # 고른 모듈은 테스트 전부, 나머지 모듈은 구조 테스트만 실행한다. 포맷 검사는 모든 모듈에 돈다.
+      - name: 고른 테스트 실행
+        if: steps.scope.outputs.full != 'true'
+        run: ./gradlew check -Pci.selection=build/ci/selection.txt
+
+  image:
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v6
@@ -24,5 +82,81 @@ jobs:
           distribution: temurin
           java-version: "25"
       - uses: gradle/actions/setup-gradle@v6
-      # 포맷 검사(ktlintCheck)와 테스트(Testcontainers MySQL)를 포함한다.
-      - run: ./gradlew build
+
+      # 이미지 지문: 실행 jar 와 Dockerfile·.dockerignore 의 sha256 을 합친 값. 이 값이 같은 이미지(fp-<지문> 태그)가
+      # 이미 있으면 새로 빌드하지 않는다. 같은 코드로 다시 빌드하면 jar 가 바이트 단위로 같다(루트 build.gradle.kts 의 아카이브 설정).
+      - name: 실행 jar 와 지문
+        id: fingerprint
+        run: |
+          ./gradlew :api:bootJar
+          fingerprint=$(sha256sum api/build/libs/*.jar Dockerfile .dockerignore | sha256sum | cut -d' ' -f1)
+          echo "value=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 이미지 이름과 태그
+        id: tags
+        env:
+          REPOSITORY: ${{ github.repository }}
+          FINGERPRINT: ${{ steps.fingerprint.outputs.value }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          image="ghcr.io/${REPOSITORY,,}"
+          {
+            echo "fingerprint=$image:fp-$FINGERPRINT"
+            # 브랜치 이력 태그: 그 브랜치에서 언제 어느 커밋으로 쓰였는지 남긴다. 롤백과 브랜치별 보관에 쓴다.
+            echo "history=$image:$BRANCH-$(date -u +%Y%m%d-%H%M%S)-${SHA::7}"
+            echo "branch=$image:$BRANCH"
+          } >> "$GITHUB_OUTPUT"
+          if docker buildx imagetools inspect "$image:fp-$FINGERPRINT" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 같은 지문의 이미지가 이미 있으면 빌드하지 않는다. 브랜치 태그와 이력 태그만 그 이미지로 옮긴다.
+      - name: 태그만 옮기기
+        if: steps.tags.outputs.exists == 'true'
+        env:
+          FINGERPRINT_TAG: ${{ steps.tags.outputs.fingerprint }}
+          HISTORY_TAG: ${{ steps.tags.outputs.history }}
+          BRANCH_TAG: ${{ steps.tags.outputs.branch }}
+        run: |
+          docker buildx imagetools create --tag "$BRANCH_TAG" --tag "$HISTORY_TAG" "$FINGERPRINT_TAG"
+          echo "같은 jar 의 이미지가 있어 새로 만들지 않았다: $FINGERPRINT_TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 이미지 빌드·푸시
+        if: steps.tags.outputs.exists != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          # 빌드 증명을 첨부하면 이미지 하나가 레지스트리에 여러 조각으로 저장돼 정리가 복잡해진다. 비공개 서버 이미지라 첨부하지 않는다.
+          provenance: false
+          tags: |
+            ${{ steps.tags.outputs.fingerprint }}
+            ${{ steps.tags.outputs.history }}
+            ${{ steps.tags.outputs.branch }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            team1.fingerprint=${{ steps.fingerprint.outputs.value }}
+
+  # 브랜치 보호의 필수 검사는 이 잡 하나로 둔다. 검사 잡을 추가하면(예: SDD 스펙 검사) needs 에만 더한다.
+  ci-result:
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            [[ "$result" == "success" || "$result" == "skipped" ]] || exit 1
+          done

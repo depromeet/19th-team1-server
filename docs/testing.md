@@ -73,4 +73,4 @@ Gradle의 test-fixtures(`src/testFixtures`)에 둔다. 다른 모듈의 테스�
 ./gradlew :core:test --tests "com.depromeet.team1.core.SomeTest"   # 테스트 클래스 하나
 ```
 
-PR의 `build` 검사가 전체 테스트를 실행한다. 통과해야 머지할 수 있다.
+`main`으로 가는 PR과 `main` 푸시는 전체 테스트를 실행한다. 통과해야 머지할 수 있다. 기능 브랜치와 `develop` 푸시는 바뀐 모듈과 그 모듈에 의존하는 모듈의 테스트, 그리고 구조 테스트(`ArchitectureTest`)만 실행한다. 고르는 규칙은 [ci.md](ci.md)에 있다.

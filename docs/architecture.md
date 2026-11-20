@@ -472,6 +472,7 @@ erDiagram
 | saved_item_embedding | (member_id) | 회원 범위 유사도 계산. 벡터 인덱스 없음 |
 | processing_job | (status, status_changed_at) WHERE status IN ('PENDING','QUEUED','RUNNING') | 멈춘 작업 재발행 |
 | processing_job | (saved_item_id, created_at DESC) | 저장물의 최근 작업, 진행 중 작업 확인 |
+| processing_job | UNIQUE (saved_item_id) WHERE job_type = 'ANALYZE' AND status IN ('PENDING','QUEUED','RUNNING') | 저장물당 진행 중인 ANALYZE 작업은 하나. 재시도·카테고리 수정이 동시에 와도 작업이 둘 생기지 않음 (`uk_processing_job_active_analyze`) |
 | conversation | (member_id) | 회원의 대화 |
 | message | (conversation_id, id) | 메시지 순서, 최근 N개 맥락 |
 | message_saved_item | PK (message_id, saved_item_id) | 답변의 결과 카드 |
@@ -481,6 +482,7 @@ erDiagram
 | analytics.behavior_event | (event_name, occurred_at) | 이벤트별 집계 |
 | analytics.behavior_event | (member_id, occurred_at) | 주간 재방문율 |
 
+- ANALYZE 작업 삽입은 `ON CONFLICT (saved_item_id) WHERE job_type = 'ANALYZE' AND status IN ('PENDING','QUEUED','RUNNING') DO NOTHING`. 삽입된 행이 없으면 API가 409.
 - 저장물 삽입은 `ON CONFLICT (member_id, normalized_url_hash) WHERE deleted_at IS NULL DO NOTHING`. 부분 인덱스 조건까지 적어야 동작한다. 삽입된 행이 없으면 처리 작업을 만들지 않고 기존 저장물을 "이미 저장됨"으로 돌려준다.
 - 목록 페이지네이션은 (created_at, id) 커서.
 
@@ -509,7 +511,7 @@ stateDiagram-v2
 
 | # | 전이 | 누가 | WHERE 조건 | 함께 바꾸는 것 |
 | --- | --- | --- | --- | --- |
-| 1 | 없음 → PENDING | 저장·재시도·카테고리 수정 API | 같은 저장물에 PENDING·QUEUED·RUNNING인 ANALYZE 작업이 없음(있으면 API가 409) | 저장물과 한 트랜잭션 |
+| 1 | 없음 → PENDING | 저장·재시도·카테고리 수정 API | 같은 저장물에 PENDING·QUEUED·RUNNING인 ANALYZE 작업이 없음. 부분 유일 인덱스 + `ON CONFLICT ... DO NOTHING`으로 막고, 삽입되지 않으면 API가 409. EMBED는 이 인덱스 대상이 아님 | 저장물과 한 트랜잭션 |
 | 2 | PENDING → QUEUED | 발행자(커밋 후) | `status = 'PENDING'` | |
 | 3 | PENDING·QUEUED → RUNNING | 워커(메시지 수신) | `status IN ('PENDING','QUEUED')` 또는 `status = 'RUNNING' AND status_changed_at < now() - 가시성 제한 시간` | `attempt_count + 1`, 워커는 올린 값을 자기 차례 번호로 기억. INITIAL·RETRY ANALYZE면 저장물 `process_status = PROCESSING` |
 | 4 | RUNNING → DONE | 워커 | `status = 'RUNNING' AND attempt_count = 내 차례 번호` | 결과 저장, ANALYZE면 EMBED 작업 생성과 저장물 `process_status = DONE`을 한 트랜잭션으로 |

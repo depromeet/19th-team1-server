@@ -20,6 +20,28 @@ val installCommitMsgHook by tasks.registering(Copy::class) {
     filePermissions { unix("rwxr-xr-x") }
 }
 
+// CI 의 테스트 선택(scripts/ci/select-tests.sh)이 읽는 모듈 목록.
+// 한 줄에 모듈 하나씩 "<Gradle 경로> <디렉터리> <의존하는 모듈들(쉼표로 구분)>"을 출력한다. 예: ":api api :core,:infra,:worker"
+// 의존은 설정 종류(implementation, runtimeOnly, testFixtures(project(..)) 등)를 구분하지 않고 모두 모은다.
+// 모든 모듈의 설정을 읽은 뒤에 모은다. 그 전에 모으면 의존이 비어 의존하는 모듈을 놓친다.
+val ciModuleLines = mutableListOf<String>()
+gradle.projectsEvaluated {
+    ciModuleLines += subprojects.map { module ->
+        val dependsOn = module.configurations
+            .flatMap { it.dependencies.withType<ProjectDependency>() }
+            .map { it.path }
+            .filter { it != module.path }
+            .toSortedSet()
+        val dir = module.projectDir.relativeTo(rootDir).invariantSeparatorsPath
+        "${module.path} $dir ${dependsOn.joinToString(",")}".trimEnd()
+    }
+}
+tasks.register("ciModules") {
+    group = "ci"
+    description = "CI 테스트 선택이 읽는 모듈과 모듈 간 의존을 출력한다"
+    doLast { ciModuleLines.forEach(::println) }
+}
+
 // 모든 모듈에 공통으로 적용하는 설정. 모듈별 의존성은 각 모듈의 build.gradle.kts 에 둔다.
 subprojects {
     group = "com.depromeet.team1"
@@ -59,5 +81,13 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+    }
+
+    // jar 에 파일 수정 시각을 넣지 않고 항목 순서를 고정한다. 그래야 같은 코드로 다시 빌드한 jar 가 바이트 단위로 같다.
+    // CI 는 실행 jar 와 Dockerfile, .dockerignore 의 sha256 이 이전과 같으면 서버 이미지를 새로 만들지 않는다(.github/workflows/ci.yml).
+    // 이 성질이 깨지면 코드가 그대로여도 빌드할 때마다 새 이미지가 생긴다. Gradle 9 의 기본값과 같지만 여기에 기대는 곳이 있어 명시한다.
+    tasks.withType<AbstractArchiveTask>().configureEach {
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
     }
 }

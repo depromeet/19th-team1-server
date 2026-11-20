@@ -28,7 +28,8 @@
 | [docs/architecture.md](docs/architecture.md) | 배포 구성, 모듈·패키지 구조, 도메인 모델 필드, 확장 지점, 결정 기록, 기능 하나를 만드는 순서 |
 | [docs/testing.md](docs/testing.md) | 계층별 테스트 방식과 대역을 고른 이유 |
 | [docs/conventions.md](docs/conventions.md) | 브랜치·커밋·PR 규칙. 커밋하거나 PR을 만들 때 읽는다 |
-| [docs/deployment.md](docs/deployment.md) | 빌드·실행 전제, 프로필, 환경변수 목록. 설정을 바꿀 때 읽는다 |
+| [docs/deployment.md](docs/deployment.md) | 빌드·실행 전제, 이미지, 프로필, 환경변수 목록. 설정을 바꿀 때 읽는다 |
+| [docs/ci.md](docs/ci.md) | CI 실행 범위, 영향받는 테스트를 고르는 규칙, 이미지를 새로 만드는 조건과 그 이유. CI·`scripts/ci/`를 바꿀 때 읽는다 |
 
 ## 빌드·실행
 

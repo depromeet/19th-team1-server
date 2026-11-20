@@ -20,7 +20,27 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 - 실행: `java -jar api/build/libs/api-0.0.1-SNAPSHOT.jar`
 - 상태 확인: `GET /actuator/health`. 정상이면 200과 `{"status":"UP"}`을 돌려준다. 배포 후 확인과 외부 상태 점검에 쓴다.
 
-## 3. 프로필
+## 3. 이미지
+
+CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. 만드는 조건과 태그 규칙은 [ci.md](ci.md)에 있다.
+
+| 이미지 | 용도 |
+| --- | --- |
+| `ghcr.io/depromeet/19th-team1-server:develop` | 개발 서버용 (`develop`의 최신) |
+| `ghcr.io/depromeet/19th-team1-server:main` | 운영 서버용 (`main`의 최신) |
+
+- 개발 서버용과 운영 서버용 이미지는 같은 패키지에 태그로 나뉜다. 컨테이너 안에서 `java org.springframework.boot.loader.launch.JarLauncher`로 실행하고, `app` 사용자(root 아님)로 돈다. 포트는 8080이다.
+- 직접 만들 때: `./gradlew :api:bootJar && docker build -t team1-server .`
+- 패키지가 비공개면 서버에서 처음 한 번 `docker login ghcr.io`로 로그인한다. 비밀번호 자리에는 `read:packages` 권한만 있는 GitHub 토큰을 쓰고, 토큰은 서버에만 둔다.
+- 서버 compose 파일은 이 레포에 없다. 서버 compose에 이 이미지를 쓰는 서비스를 `app`이라는 이름으로 두면, 아래 명령으로 새 이미지를 받아 그 서비스만 다시 띄운다.
+
+  ```bash
+  docker compose pull app && docker compose up -d --no-deps app
+  ```
+
+  서비스의 이미지를 개발 서버는 `ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:-develop}`, 운영 서버는 `…:${APP_IMAGE_TAG:-main}`처럼 두면, `APP_IMAGE_TAG`에 브랜치 이력 태그(`<브랜치>-<UTC 시각>-<커밋 7자리>`, 예: `main-20261120-153000-abc1234`)를 넣고 같은 명령을 실행해 이전 버전으로 되돌릴 수 있다. 태그 목록은 GHCR 패키지 화면에서 본다.
+
+## 4. 프로필
 
 | 프로필 | 쓰는 곳 | 설정을 읽는 곳 |
 | --- | --- | --- |
@@ -31,7 +51,7 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 - `SPRING_PROFILES_ACTIVE`를 주지 않으면 `local`로 뜬다. 서버에서는 반드시 지정한다.
 - 프로필별로 다른 설정이 생기면 `api/src/main/resources/application-{프로필}.yml`을 추가한다.
 
-## 4. 환경변수
+## 5. 환경변수
 
 값은 코드·설정 파일·문서에 넣지 않는다. 로컬은 `.env`(커밋 금지), 서버는 배포 환경의 비밀값 저장소로 주입한다. 이름은 `.env.example`에도 같은 목록을 둔다.
 
@@ -42,9 +62,9 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 | `DB_USERNAME`, `DB_PASSWORD` | 앱, 로컬 MySQL | DB 계정 |
 | `DB_NAME`, `DB_ROOT_PASSWORD` | 로컬 MySQL | 컨테이너가 처음 뜰 때 만들 DB와 root 비밀번호 |
 
-기능이 추가되면 이 표에 함께 추가한다. 예정된 항목(LLM 키·사용량 상한, 워커·스케줄러 플래그)은 `docs/architecture.md` 4장과 8장을 따른다.
+기능이 추가되면 이 표에 함께 추가한다.
 
-## 5. 로컬 실행
+## 6. 로컬 실행
 
 ```bash
 cp .env.example .env        # 처음 한 번. 비밀번호 칸을 채운다

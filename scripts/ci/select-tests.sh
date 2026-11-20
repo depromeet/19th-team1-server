@@ -51,7 +51,7 @@ is_ignored() {
   case "$1" in
     *.md | docs/* | .claude/* | .github/ISSUE_TEMPLATE/* | scripts/git-hooks/*) return 0 ;;
     compose.yaml | .env.example | Dockerfile | .dockerignore | .editorconfig | .gitignore | .gitattributes) return 0 ;;
-    scripts/check-convention.sh) return 0 ;;
+    scripts/check-convention.sh | scripts/llm-eval/*) return 0 ;;
   esac
   return 1
 }

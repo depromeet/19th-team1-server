@@ -1,0 +1,48 @@
+{
+  "categories_provisional": true,
+  "categories": [
+    {"name": "맛집·음식", "hint": "식당, 카페, 레시피, 음식 리뷰"},
+    {"name": "여행·장소", "hint": "여행지, 숙소, 가 볼 곳, 지도 장소"},
+    {"name": "쇼핑·패션", "hint": "사고 싶은 물건, 상품, 옷, 뷰티"},
+    {"name": "공부·커리어", "hint": "개발, 강의, 업무 노하우, 취업, 자기계발"},
+    {"name": "문화·엔터", "hint": "영화, 드라마, 음악, 책, 공연, 게임"},
+    {"name": "디자인·영감", "hint": "디자인 레퍼런스, 인테리어, 사진, 아이디어"},
+    {"name": "건강·운동", "hint": "운동 루틴, 식단, 건강 정보"},
+    {"name": "생활·정보", "hint": "위 어디에도 맞지 않는 생활 팁, 뉴스, 금융, 기타"}
+  ],
+  "body_max_chars": 6000,
+  "models": [
+    {
+      "id": "claude-haiku-5-5", "provider": "anthropic", "key_env": "ANTHROPIC_API_KEY",
+      "effort": "low",
+      "price_per_mtok": {"input": 0.10, "output": 0.50},
+      "price_source": "Anthropic 모델 표 (claude-api 스킬 캐시 2026-11-03, 입력 10만 토큰 이하 단가). 실행 전 https://platform.claude.com/docs/en/about-claude/pricing 에서 재확인"
+    },
+    {
+      "id": "claude-sonnet-5-5", "provider": "anthropic", "key_env": "ANTHROPIC_API_KEY",
+      "effort": "low",
+      "price_per_mtok": {"input": 2.00, "output": 10.00},
+      "price_source": "Anthropic 모델 표 (claude-api 스킬 캐시 2026-11-03). 실행 전 재확인"
+    },
+    {
+      "id": "gpt-5.4-nano", "provider": "openai", "key_env": "OPENAI_API_KEY",
+      "price_per_mtok": null,
+      "price_source": "미확인. 검색 결과(2026-11-21)로 본 값은 입력 0.20 / 출력 1.25인데 8개월 전 자료라 https://developers.openai.com/api/docs/pricing 에서 확인 후 채운다. 더 새 모델이 있는지도 확인"
+    },
+    {
+      "id": "gpt-5.4-mini", "provider": "openai", "key_env": "OPENAI_API_KEY",
+      "price_per_mtok": null,
+      "price_source": "미확인. 검색 결과로 본 값은 입력 0.75 / 출력 4.50. 공식 단가표에서 확인 후 채운다"
+    },
+    {
+      "id": "gemini-3.5-flash-lite", "provider": "gemini", "key_env": "GEMINI_API_KEY",
+      "price_per_mtok": null,
+      "price_source": "미확인. 검색 결과로 본 값은 입력 0.30 / 출력 2.50. https://ai.google.dev/gemini-api/docs/pricing 에서 확인 후 채운다"
+    },
+    {
+      "id": "gemini-3.8-flash", "provider": "gemini", "key_env": "GEMINI_API_KEY",
+      "price_per_mtok": null,
+      "price_source": "미확인. 2026년 말까지 프로모션 단가(입력 0.75 / 출력 3.75)이고 2027-01-01부터 정가(1.50 / 7.50)라는 자료가 있다. 단가표와 출시 노트가 서로 달라 확인 후 채운다. 비교는 정가로 한다"
+    }
+  ]
+}

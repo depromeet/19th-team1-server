@@ -1,0 +1,33 @@
+name: Auto assign
+
+# 이슈·PR을 열면 담당자가 비어 있을 때 작성자를 담당자로 지정한다. 리뷰어는 CODEOWNERS가 정한다.
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    # 봇이 연 이슈·PR(dependabot 등)은 건너뛴다.
+    if: ${{ !endsWith(github.event.issue.user.login || github.event.pull_request.user.login, '[bot]') }}
+    steps:
+      - name: 작성자를 담당자로 지정
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.issue.user.login || github.event.pull_request.user.login }}
+          ASSIGNEES: ${{ toJSON(github.event.issue.assignees || github.event.pull_request.assignees) }}
+        run: |
+          if [ "$(jq length <<<"$ASSIGNEES")" -gt 0 ]; then
+            echo "담당자가 이미 있어 건너뜀"
+            exit 0
+          fi
+          gh api -X POST "repos/$REPO/issues/$NUMBER/assignees" -f "assignees[]=$AUTHOR" >/dev/null
+          echo "#$NUMBER 담당자: $AUTHOR"

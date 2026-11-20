@@ -39,7 +39,6 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
   ```
 
   서버 compose의 이미지를 `ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:-main}`처럼 두면, `APP_IMAGE_TAG=<브랜치>-<UTC 시각>-<커밋 7자리>`(브랜치 이력 태그, 예: `main-20261120-153000-abc1234`)로 바꿔 같은 명령을 실행해 이전 버전으로 되돌릴 수 있다. 태그 목록은 GHCR 패키지 화면에서 본다.
-- 역할 나누기: API, 워커, 스케줄러는 같은 이미지로 띄운다. 나눠 띄울 때는 환경변수로 끄고 켠다. 웹 서버 없이 워커만 띄우려면 `SPRING_MAIN_WEB_APPLICATION_TYPE=none`을 준다. 워커·스케줄러 플래그(`WORKER_ENABLED`, `SCHEDULER_ENABLED`)는 `docs/architecture.md` 4장을 따른다.
 
 ## 4. 프로필
 
@@ -63,7 +62,7 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | `DB_USERNAME`, `DB_PASSWORD` | 앱, 로컬 MySQL | DB 계정 |
 | `DB_NAME`, `DB_ROOT_PASSWORD` | 로컬 MySQL | 컨테이너가 처음 뜰 때 만들 DB와 root 비밀번호 |
 
-기능이 추가되면 이 표에 함께 추가한다. 예정된 항목(LLM 키·사용량 상한, 워커·스케줄러 플래그)은 `docs/architecture.md` 4장과 8장을 따른다.
+기능이 추가되면 이 표에 함께 추가한다.
 
 ## 6. 로컬 실행
 

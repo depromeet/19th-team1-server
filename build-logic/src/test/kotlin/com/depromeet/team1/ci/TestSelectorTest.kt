@@ -41,6 +41,24 @@ class TestSelectorTest {
     }
 
     @Test
+    fun `직접 선언하지 않고 다른 모듈을 거쳐 의존하는 모듈도 고른다`() {
+        // c 는 a 를 직접 선언하지 않고 b 를 거쳐 의존한다
+        val chain = TestSelector(
+            listOf(
+                ModuleModel(":a", "a", emptySet()),
+                ModuleModel(":b", "b", setOf(":a")),
+                ModuleModel(":c", "c", setOf(":b")),
+            ),
+        )
+
+        val selection = chain.select(listOf("a/src/main/kotlin/A.kt"))
+
+        assertIs<Selection.Selected>(selection)
+        assertEquals(setOf(":a", ":b", ":c"), selection.modules.keys)
+        assertEquals(":a 에 의존", selection.modules[":c"])
+    }
+
+    @Test
     fun `테스트 코드, 리소스, 마이그레이션, 모듈 빌드 파일도 그 모듈의 변경으로 본다`() {
         listOf(
             "infra/src/test/kotlin/com/depromeet/team1/infra/SomeTest.kt",

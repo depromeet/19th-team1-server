@@ -1,4 +1,4 @@
-# 서버 이미지. api 와 worker 가 한 프로세스로 돈다. 역할은 환경변수(WORKER_ENABLED, SCHEDULER_ENABLED)로 나눈다.
+# 서버 이미지.
 # CI 가 ./gradlew :api:bootJar 로 만든 실행 jar 를 담는다. 빌드는 이미지 안에서 하지 않는다.
 # CI 는 실행 jar 와 이 파일의 sha256 이 이전과 같으면 이미지를 새로 만들지 않는다. 이 파일만 바꿔도 새 이미지가 만들어진다.
 

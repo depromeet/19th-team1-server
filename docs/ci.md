@@ -65,7 +65,7 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 | 항목 | 내용 |
 | --- | --- |
 | 위치 | `ghcr.io/depromeet/19th-team1-server` (비공개) |
-| 내용 | `api` 실행 jar 하나. `api`, `worker`가 한 프로세스로 돈다 |
+| 내용 | `api` 실행 jar 하나. `api`가 의존하는 `core`·`infra`·`worker` 모듈이 함께 들어간다 |
 | 태그 | `fp-<지문>`(jar와 Dockerfile 내용), `<브랜치>-<UTC 시각>-<커밋 7자리>`(브랜치 이력, 예: `develop-20261120-153000-abc1234`), `develop`·`main`(각 서버가 받는 최신) |
 | 권한 | `GITHUB_TOKEN` + `packages: write`. 따로 넣는 비밀값은 없다 |
 

@@ -11,11 +11,11 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
-    implementation("org.flywaydb:flyway-mysql")
-    runtimeOnly("com.mysql:mysql-connector-j")
+    implementation("org.flywaydb:flyway-database-postgresql")
+    runtimeOnly("org.postgresql:postgresql")
 
     testFixturesImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
     testFixturesImplementation("org.springframework.boot:spring-boot-test")
     testFixturesApi("org.springframework.boot:spring-boot-testcontainers")
-    testFixturesApi("org.testcontainers:testcontainers-mysql")
+    testFixturesApi("org.testcontainers:testcontainers-postgresql")
 }

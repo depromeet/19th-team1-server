@@ -20,7 +20,7 @@
 - **규모**: 프리런칭 사용자 30명 이하. 이후 확장을 전제로 한다.
 - **비용**: 서버·LLM 비용을 팀이 직접 부담한다. 서버는 최소 사양으로 시작한다.
 - **핵심 지표**: 자발 재열람 (알림을 통하지 않고 검색·목록으로 다시 여는 것).
-- **스택**: JDK 25, Kotlin 2.3, Spring Boot 4.1(Spring MVC, 가상 스레드), Gradle 9, MySQL, Swagger(springdoc). 추가 DB는 방향 확정 후 검토한다. 정확한 버전은 `gradle/libs.versions.toml`과 Gradle wrapper 설정이 원본이다.
+- **스택**: JDK 25, Kotlin 2.3, Spring Boot 4.1(Spring MVC, 가상 스레드), Gradle 9, PostgreSQL, Swagger(springdoc). 추가 DB는 방향 확정 후 검토한다. 정확한 버전은 `gradle/libs.versions.toml`과 Gradle wrapper 설정이 원본이다.
 
 ## 2. 설계 원칙
 
@@ -47,7 +47,7 @@
 - **역할 켜고 끄기**: 워커와 스케줄러는 설정 플래그(`WORKER_ENABLED`, `SCHEDULER_ENABLED`)로 켜고 끈다. 같은 이미지를 컨테이너 두 개로 띄워 역할을 나누는 것이 코드 변경 없이 가능하다.
 - **환경**: `local`(각자 PC, Docker Compose) / `dev`(개발 서버) / `prod`(운영 서버). 개발 서버를 먼저 띄우고 프리런칭 전에 운영 서버를 추가한다. 두 서버는 같은 이미지와 같은 Compose 파일을 쓰고 환경변수만 다르다.
 - **배포 중 끊김 허용**: 무중단 배포는 하지 않는다. 배포로 중단된 작업은 작업 테이블의 회수 로직으로 복구한다.
-- **DB 위치** `[제안]`: MySQL을 앱과 같은 서버에 컨테이너로 띄우고, 하루 한 번 덤프를 서버 밖에 보관한다. 관리형 DB는 서버 한 대 분의 비용이 더 든다.
+- **DB 위치** `[제안]`: PostgreSQL을 앱과 같은 서버에 컨테이너로 띄우고, 하루 한 번 덤프를 서버 밖에 보관한다. 관리형 DB는 서버 한 대 분의 비용이 더 든다.
 - **서버가 2대 이상이 될 때**: 스케줄 작업이 중복 실행되므로 잠금 장치가 필요하다. 워커는 작업 획득 쿼리로 이미 중복을 막는다.
 
 ## 5. 모듈 구조
@@ -69,7 +69,7 @@ flowchart TB
 | 모듈 | 역할 | 의존 가능 대상 | 쓸 수 있는 기술 |
 | --- | --- | --- | --- |
 | `core` | 도메인 모델, 서비스, 경계 인터페이스 | 없음 | Spring의 DI·트랜잭션 어노테이션까지. JPA, 웹, HTTP 클라이언트, LLM SDK 금지 |
-| `infra` | 경계 인터페이스의 구현. DB(`storage`)와 외부 연동(`external`)을 패키지로 나눈다 | `core` | JPA, MySQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, 푸시 SDK |
+| `infra` | 경계 인터페이스의 구현. DB(`storage`)와 외부 연동(`external`)을 패키지로 나눈다 | `core` | JPA, PostgreSQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, 푸시 SDK |
 | `api` | 요청으로 시작하는 진입점(컨트롤러)과 설정. 실행 모듈 | `core` (코드에서), `infra`·`worker` (실행 시 조립만) | Spring MVC, springdoc, actuator |
 | `worker` | 요청 없이 도는 진입점(작업 폴링, 스케줄러) | `core` | Spring의 스케줄링 |
 
@@ -117,7 +117,7 @@ core        com.depromeet.team1.core
 └── common/             공통 에러 타입, 공용 값
 
 infra       com.depromeet.team1.infra
-├── storage/mysql/
+├── storage/postgresql/
 │   ├── item/           ItemJpaEntity, ItemJpaRepository(Spring Data), JpaItemRepository(구현), 변환 함수
 │   ├── …               (core 의 기능 이름과 맞춘다)
 │   └── config/         JPA 설정
@@ -215,7 +215,7 @@ worker      com.depromeet.team1.worker
 
 | 인터페이스 (`core`) | 역할 | 지금 넣는 구현 | 나중에 넣을 구현 |
 | --- | --- | --- | --- |
-| `XxxRepository` | 도메인 모델 저장·조회 | `infra`의 MySQL 구현 | 필요 시 다른 DB 구현 추가 |
+| `XxxRepository` | 도메인 모델 저장·조회 | `infra`의 PostgreSQL 구현 | 필요 시 다른 DB 구현 추가 |
 | `ItemAnalyzer` | 저장물 → 요약·주제·추가 정보 | 고정값을 돌려주는 가짜 구현 | 비전 LLM(A) / 텍스트 LLM(B) |
 | `LlmClient` | LLM 호출 | 인터페이스만 | 선택한 LLM 벤더 클라이언트 |
 | `JobQueue` | 작업 등록·획득 | DB 작업 테이블 | 메시지 큐 |
@@ -233,7 +233,7 @@ worker      com.depromeet.team1.worker
 sequenceDiagram
     participant C as 클라이언트
     participant A as api (컨트롤러)
-    participant DB as MySQL
+    participant DB as PostgreSQL
     participant W as worker
     participant L as ItemAnalyzer
 
@@ -305,7 +305,7 @@ sequenceDiagram
 | 헥사고날 구조를 전부 따르지 않음 | 의존 방향을 안쪽으로 모으는 것과 바깥 경계의 인터페이스는 가져온다. 서비스마다 두는 입력 인터페이스, 유스케이스별 클래스, 계층마다의 모델 변환은 가져오지 않는다. 구현이 하나뿐인 인터페이스와 변환 코드는 2명·3개월 일정에서 비용만 든다 |
 | Spring MVC + 가상 스레드, WebFlux 미사용 | JPA가 블로킹이라 WebFlux의 이점을 얻기 어렵고, 오래 걸리는 LLM 호출은 워커가 요청 밖에서 처리한다. 응답을 기다리는 동안 스레드를 잡는 문제는 가상 스레드로 푼다 |
 | 트랜잭션은 서비스의 `@Transactional`, 외부 호출이 낀 흐름은 저장소 메서드 단위 커밋 | 함께 저장할 일이 많은 요청 처리에서는 묶는 쪽이 기본이어야 실수가 적다. 외부 호출을 기다리는 동안 DB 커넥션을 잡지 않으려고 그 흐름만 끊는다 |
-| 서비스 테스트는 직접 만든 가짜 구현으로, 쿼리는 실제 MySQL로 | 목은 구현을 그대로 따라 적기 쉬워 틀린 코드도 통과시킨다. 쿼리는 실행해 봐야 검증된다. 상세는 [testing.md](testing.md) |
+| 서비스 테스트는 직접 만든 가짜 구현으로, 쿼리는 실제 PostgreSQL로 | 목은 구현을 그대로 따라 적기 쉬워 틀린 코드도 통과시킨다. 쿼리는 실행해 봐야 검증된다. 상세는 [testing.md](testing.md) |
 | 상태 변경 규칙은 도메인 모델의 메서드에, 조회 전용 화면은 조회 모델로 | 전이 규칙이 서비스에 흩어지면 검사가 빠지기 쉽다. 반대로 보여 주기만 하는 조회까지 도메인 모델을 만들었다가 바꾸는 것은 비용만 든다 |
 | 서비스는 기능당 하나로 시작 | 조회용·변경용 분리의 이점(읽기 전용 DB 분리, 큰 파일 나누기)이 지금은 없다. 커지면 나눈다 |
 | 서비스 인터페이스를 두지 않음 | 구현이 하나뿐인 인터페이스는 코드만 늘린다. 바깥 기술과 닿는 경계에만 인터페이스를 둔다 |
@@ -314,7 +314,7 @@ sequenceDiagram
 | JDK 25 + Spring Boot 4.1 + Kotlin 2.3 + Gradle 9 | 시작 시점의 최신 LTS JDK와 최신 안정 버전이다. Kotlin은 2.3부터 JDK 25를 지원한다. 서버는 컨테이너로 실행하므로 JDK 버전이 클라우드 선택에 영향을 주지 않는다 |
 | 기본 패키지는 `com.depromeet.team1` | 패키지명은 바꾸는 비용이 크다. 서비스명과 무관한 이름으로 고정하고, 서비스명은 문서 제목과 애플리케이션 이름에만 쓴다 |
 | 실행 모듈 이름은 `api` | 배포 단위는 주된 역할로 이름 짓는다 |
-| 로컬 DB는 Docker Compose, 테스트 DB는 Testcontainers | 로컬과 테스트 모두 운영과 같은 MySQL로 돌려, H2 같은 대체 DB와의 문법 차이를 없앤다 |
+| 로컬 DB는 Docker Compose, 테스트 DB는 Testcontainers | 로컬과 테스트 모두 운영과 같은 PostgreSQL로 돌려, H2 같은 대체 DB와의 문법 차이를 없앤다 |
 | 비동기 처리는 DB 작업 테이블 + 워커 | 추가 인프라 없이 재시도·복구가 가능하다. 메시지 큐는 `JobQueue` 뒤에서 교체한다 |
 | 가져오기 묶음과 예약 알림을 공통 뼈대에 포함 | 두 방향 모두 첫 진입에서 수백 건을 한 번에 가져오고, 정해진 시각에 알림을 보낸다 |
 
@@ -322,7 +322,7 @@ sequenceDiagram
 
 | # | 항목 | 제안 | 누구와 / 언제 |
 | --- | --- | --- | --- |
-| 1 | MySQL 위치 | 앱과 같은 서버에 컨테이너 + 일 1회 덤프 | 서버 |
+| 1 | DB 위치 | 앱과 같은 서버에 컨테이너 + 일 1회 덤프 | 서버 |
 | 2 | 모듈 안 패키지 배치 | 기능 우선 (6장) | 서버 |
 | 3 | 주제 저장 형태 | `item_topic` 별도 테이블 | 서버 |
 | 4 | 응답 포맷 | 9장 형태로 구현해 두었다. 웹팀 확인 후 확정 | 서버 + 웹 |
@@ -331,7 +331,7 @@ sequenceDiagram
 | 7 | 인증 방식 | 미정 | 서버 + 웹 + 기획 |
 | 8 | 클라우드 | 미정 | 크레딧 지원 여부 확인 후 |
 | 9 | LLM 벤더와 예산 | 미정 | 팀 |
-| 10 | 추가 DB | MySQL로 가능한지 먼저 검토 | 11/14 방향 확정 후 |
+| 10 | 추가 DB | PostgreSQL 확장(JSONB, pgvector)으로 가능한지 먼저 검토 | 11/14 방향 확정 후 |
 | 11 | 스크린샷 원본 보관 기간·삭제 정책 | 개인정보가 담길 수 있어 정책 필요 | A안 확정 시 |
 | 12 | 링크 본문 수집 방식 | 차단 사이트 처리, 내부망 주소 호출 방지 필요 | B안 확정 시 |
 | 13 | 꺼내기 서비스 형태 | — | 11/14 방향 확정 후 |
@@ -354,8 +354,8 @@ sequenceDiagram
 
 - 산출물은 컨테이너 이미지 1개
 - 설정은 전부 환경변수 주입
-- 외부 의존은 MySQL 1대
-- 서버 한 대에 앱 컨테이너와 MySQL 컨테이너를 함께 올릴 수 있는 메모리(2GB 이상)
+- 외부 의존은 PostgreSQL 1대
+- 서버 한 대에 앱 컨테이너와 PostgreSQL 컨테이너를 함께 올릴 수 있는 메모리(2GB 이상)
 
 빌드 명령, 서버 구축, 배포 절차는 별도 문서(`docs/deployment.md`)에 정리한다.
 
@@ -368,8 +368,8 @@ sequenceDiagram
 | 1 | `core` | 도메인 모델. 프레임워크 어노테이션 없이 규칙과 상태 변경을 담는다 | `core/item/Item.kt` |
 | 2 | `core` | 경계 인터페이스, 서비스, 에러 코드 | `core/item/ItemRepository.kt`, `ItemService.kt`, `ItemError.kt` |
 | 3 | `core` | 가짜 구현과 서비스 테스트. Spring 없이 서비스를 조립한다 | `core/src/testFixtures`, `core/src/test` |
-| 4 | `infra` | JPA 엔티티, 인터페이스 구현, 변환 함수, Flyway 스크립트 | `infra/storage/mysql/item/`, `resources/db/migration/` |
-| 5 | `infra` | 저장소 테스트. 실제 MySQL에서 쿼리를 실행한다 | `infra/src/test` |
+| 4 | `infra` | JPA 엔티티, 인터페이스 구현, 변환 함수, Flyway 스크립트 | `infra/storage/postgresql/item/`, `resources/db/migration/` |
+| 5 | `infra` | 저장소 테스트. 실제 PostgreSQL에서 쿼리를 실행한다 | `infra/src/test` |
 | 6 | `api` | 컨트롤러, 요청·응답 DTO, 컨트롤러 테스트 | `api/web/item/` |
 | 7 | `worker` | 비동기 작업이 있을 때만. 작업을 가져와 서비스를 호출한다 | `worker/job/` |
 

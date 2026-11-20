@@ -7,7 +7,7 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 | 항목 | 버전 | 비고 |
 | --- | --- | --- |
 | JDK | 25 | 로컬에 없으면 Gradle이 자동으로 내려받는다 |
-| Docker | Compose v2 | 로컬 MySQL과 테스트(Testcontainers)에 필요하다 |
+| Docker | Compose v2 | 로컬 PostgreSQL과 테스트(Testcontainers)에 필요하다 |
 
 ## 2. 빌드
 
@@ -15,7 +15,7 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 ./gradlew build
 ```
 
-- 테스트가 MySQL 컨테이너를 띄우므로 빌드하는 곳에 Docker가 있어야 한다.
+- 테스트가 PostgreSQL 컨테이너를 띄우므로 빌드하는 곳에 Docker가 있어야 한다.
 - 산출물은 `api/build/libs/` 아래 실행 jar 하나다.
 - 실행: `java -jar api/build/libs/api-0.0.1-SNAPSHOT.jar`
 - 상태 확인: `GET /actuator/health`. 정상이면 200과 `{"status":"UP"}`을 돌려준다. 배포 후 확인과 외부 상태 점검에 쓴다.
@@ -58,9 +58,9 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | 이름 | 필요한 곳 | 용도 |
 | --- | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | 서버 | `dev` 또는 `prod` |
-| `DB_URL` | 앱 | JDBC URL (예: `jdbc:mysql://호스트:3306/DB이름`) |
-| `DB_USERNAME`, `DB_PASSWORD` | 앱, 로컬 MySQL | DB 계정 |
-| `DB_NAME`, `DB_ROOT_PASSWORD` | 로컬 MySQL | 컨테이너가 처음 뜰 때 만들 DB와 root 비밀번호 |
+| `DB_URL` | 앱 | JDBC URL (예: `jdbc:postgresql://호스트:5432/DB이름`) |
+| `DB_USERNAME`, `DB_PASSWORD` | 앱, 로컬 PostgreSQL | DB 계정 |
+| `DB_NAME` | 로컬 PostgreSQL | 컨테이너가 처음 뜰 때 만들 DB |
 
 기능이 추가되면 이 표에 함께 추가한다.
 
@@ -68,8 +68,8 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 
 ```bash
 cp .env.example .env        # 처음 한 번. 비밀번호 칸을 채운다
-docker compose up -d        # MySQL
+docker compose up -d        # PostgreSQL
 ./gradlew :api:bootRun      # 앱 (local 프로필)
 ```
 
-MySQL 데이터는 Docker 볼륨에 남는다. 처음부터 다시 만들려면 `docker compose down -v`.
+PostgreSQL 데이터는 Docker 볼륨에 남는다. 처음부터 다시 만들려면 `docker compose down -v`.

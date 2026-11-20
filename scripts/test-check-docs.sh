@@ -50,6 +50,18 @@ MD
 | E1-2 | 미등록 스토리 | 미등록 | 나 | 1 | — | — |
 MD
   cp "$src/docs/plan/stories/_template.md" "$repo/docs/plan/stories/"
+  # 환경변수: 코드에서 쓰는 이름이 deployment.md 표와 .env.example 에 모두 있다. 한 칸에 여러 이름도 쓴다.
+  mkdir -p "$repo/api/src/main/resources"
+  printf 'spring:\n  datasource:\n    url: ${DB_URL}\n    username: ${DB_USERNAME:app}\n' >"$repo/api/src/main/resources/application.yml"
+  printf 'services:\n  db:\n    environment:\n      POSTGRES_DB: ${DB_NAME:?DB_NAME 필요}\n' >"$repo/compose.yaml"
+  cat >"$repo/docs/deployment.md" <<'MD'
+| 이름 | 쓰는 곳 | 값 |
+| --- | --- | --- |
+| `DB_URL` | 앱 | JDBC URL (예: `jdbc:postgresql://호스트:5432/DB이름`) |
+| `DB_USERNAME`, `DB_PASSWORD` | 앱 | DB 계정 |
+| `DB_NAME` | 로컬 | DB 이름 |
+MD
+  printf 'DB_URL=\nDB_USERNAME=\nDB_PASSWORD=\nDB_NAME=\n' >"$repo/.env.example"
   git -C "$repo" init -q
   git -C "$repo" add -A
 }
@@ -102,6 +114,20 @@ run "$repo"
 expect_contains "$out" "docs/a.md" "지운 표기 위치(문서)"
 expect_contains "$out" "infra/storage/mysql/A.kt" "지운 표기 위치(코드)"
 expect_missing "$out" "roadmap.md" "예외로 둔 roadmap 스토리 제목"
+
+# --- 환경변수: 코드에서 쓰는데 문서 표·.env.example 에 없음
+new_repo env
+printf '  llm:\n    key: ${LLM_API_KEY}\n' >>"$repo/api/src/main/resources/application.yml"
+printf 'LLM_API_KEY=\n' >>"$repo/.env.example"
+printf '      PUSH: ${PUSH_KEY}\n' >>"$repo/compose.yaml"
+git -C "$repo" add -A
+run "$repo"
+[ "$code" = 1 ] || fail "환경변수 누락: code=$code"
+expect_contains "$out" "LLM_API_KEY" "deployment.md 에 없는 변수"
+expect_contains "$out" "docs/deployment.md" "누락 위치(문서 표)"
+expect_contains "$out" "PUSH_KEY" "compose.yaml 에서 쓰는 변수"
+expect_contains "$out" ".env.example" "누락 위치(.env.example)"
+expect_missing "$out" "DB_PASSWORD" "한 칸에 여러 이름을 적은 변수는 통과"
 
 # --- PR: Closes·Refs 없음
 new_repo pr

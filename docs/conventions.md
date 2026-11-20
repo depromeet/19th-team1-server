@@ -145,7 +145,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 | 커밋할 때: `pre-commit` 훅 | 스테이지된 Kotlin 파일을 ktlint로 포맷해 커밋에 포함한다 | `--no-verify`로 건너뛸 수 있다 |
 | 커밋할 때: `commit-msg` 훅 | 브랜치 이름에서 이슈 번호를 읽어 메시지에 붙이고, 형식이 틀리면 커밋을 거부한다 | `--no-verify`로 건너뛸 수 있다 |
 | Claude Code가 커밋할 때: 커밋 직전 훅(`.claude/settings.json`) | 문서 검사(`scripts/check-docs.sh`). 실패하면 커밋을 막는다 | 세션을 시작한 폴더만 검사한다. 다른 워크트리에서 한 커밋은 검사하지 않는다 |
-| 푸시할 때: `pre-push` 훅 | 문서 검사(`scripts/check-docs.sh`): 문서 안 상대 링크, roadmap 이슈 번호, 지운 표기 | `--no-verify`로 건너뛸 수 있다 |
+| 푸시할 때: `pre-push` 훅 | 문서 검사(`scripts/check-docs.sh`): 문서 안 상대 링크, roadmap 이슈 번호, 지운 표기, 코드에서 쓰는 환경변수가 `docs/deployment.md` 표와 `.env.example`에 있는지 | `--no-verify`로 건너뛸 수 있다 |
 | PR을 올리거나 수정할 때: `Convention` 워크플로 | PR 제목, 브랜치 이름, PR에 든 커밋 메시지, PR 본문(`Closes`·`Refs`, 닫는 이슈의 스토리 파일)을 검사한다 | 통과해야 머지할 수 있다 |
 | 기능 브랜치·`develop`에 푸시할 때: `CI` 워크플로 | 바뀐 모듈과 그 모듈에 의존하는 모듈의 테스트, 구조 테스트, 포맷 검사 ([ci.md](ci.md)), 문서 검사 | 머지를 막지 않는다. `develop`은 통과해야 이미지를 올린다 |
 | `main`에 푸시될 때(머지 후): `CI` 워크플로 | `./gradlew ktlintCheck build` (포맷 검사, 전체 테스트), 문서 검사 | 통과해야 이미지를 올린다 |

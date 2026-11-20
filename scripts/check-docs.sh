@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 문서 정합성 중 기계적으로 확인할 수 있는 것을 검사한다. 읽고 판단해야 하는 정합성은 doc-check 스킬이 다룬다.
 #
-#   scripts/check-docs.sh       레포 검사: 문서 안 상대 링크, roadmap 이슈 번호, 지운 표기
+#   scripts/check-docs.sh       레포 검사: 문서 안 상대 링크, roadmap 이슈 번호, 지운 표기, 환경변수
 #   scripts/check-docs.sh pr    PR 검사: 본문(PR_BODY 환경변수)의 Closes #N·Refs #N, 닫는 이슈의 스토리 파일이 남았는지
 #
 # 실패하면 1로 끝난다. gh 가 없거나 조회에 실패하면 roadmap 이슈 번호 검사만 건너뛰고 건너뛰었다고 출력한다.
@@ -88,6 +88,23 @@ check_removed_terms() {
   done
 }
 
+# 코드(application*.yml, compose.yaml)에서 ${이름} 으로 쓰는 환경변수가 docs/deployment.md 표와 .env.example 에
+# 모두 있는지. 코드 → 문서 방향만 본다. 문서에만 있는 이름(SPRING_PROFILES_ACTIVE 등)은 검사하지 않는다.
+check_env_vars() {
+  local doc=docs/deployment.md example=.env.example documented examples hit name
+  [ -f "$doc" ] || return 0
+  # 표의 첫 칸에 백틱으로 적은 이름. 한 칸에 여러 개를 적어도 된다.
+  documented="$(awk -F'|' '/^\|/ { print $2 }' "$doc" | grep -oE '`[A-Z][A-Z0-9_]*`' | tr -d '`' | sort -u || true)"
+  examples="$( { [ -f "$example" ] && grep -oE '^[A-Z][A-Z0-9_]*=' "$example" | tr -d '='; } | sort -u || true)"
+  # 출력: 파일:줄:${이름. 같은 이름은 처음 쓴 곳만 보고한다.
+  while IFS= read -r hit; do
+    name="${hit##*\$\{}"
+    grep -qxF "$name" <<<"$documented" || report "환경변수" "${hit%:*} → $name 이 $doc 표에 없음"
+    grep -qxF "$name" <<<"$examples" || report "환경변수" "${hit%:*} → $name 이 $example 에 없음"
+  done < <(git grep -n -oE '\$\{[A-Z][A-Z0-9_]*' -- '*application*.yml' '*application*.yaml' 'compose.yaml' 'compose.yml' |
+    awk -F: '{ n = $NF; sub(/^\$\{/, "", n); if (!(n in seen)) { seen[n] = 1; print } }' || true)
+}
+
 check_pr() {
   local body="${PR_BODY:-}" n file
   if ! grep -qiE '(^|[^[:alnum:]_])(closes|refs) #[0-9]+' <<<"$body"; then
@@ -104,7 +121,7 @@ check_pr() {
 }
 
 case "${1:-}" in
-  "") check_links; check_roadmap_issues; check_removed_terms ;;
+  "") check_links; check_roadmap_issues; check_removed_terms; check_env_vars ;;
   pr) check_pr ;;
   *) echo "사용법: $0 [pr]" >&2; exit 2 ;;
 esac

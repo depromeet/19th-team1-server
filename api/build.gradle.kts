@@ -15,7 +15,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation(libs.springdoc.webmvc.ui)
 
-    // 테스트용 MySQL 컨테이너 설정을 가져온다.
+    // 테스트용 PostgreSQL 컨테이너 설정을 가져온다.
     testImplementation(testFixtures(project(":infra")))
     testImplementation(libs.archunit)
 }

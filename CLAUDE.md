@@ -4,7 +4,7 @@
 
 ## 프로젝트
 
-디프만 19기 1팀 서버. 저장만 하고 다시 쓰지 않는 정보를 "저장 → 다시 꺼내기 → 재사용"하게 만드는 서비스다. Kotlin, Spring Boot, MySQL.
+디프만 19기 1팀 서버. 저장만 하고 다시 쓰지 않는 정보를 "저장 → 다시 꺼내기 → 재사용"하게 만드는 서비스다. Kotlin, Spring Boot, PostgreSQL.
 
 ## 규칙 파일
 
@@ -35,7 +35,7 @@
 ## 빌드·실행
 
 ```bash
-docker compose up -d            # 로컬 MySQL (처음엔 cp .env.example .env)
+docker compose up -d            # 로컬 PostgreSQL (처음엔 cp .env.example .env)
 ./gradlew build                 # 전체 빌드 + 테스트 (Docker 필요)
 ./gradlew :api:bootRun          # 애플리케이션 실행
 ./gradlew :core:test            # 모듈별 테스트

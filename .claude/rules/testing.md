@@ -17,12 +17,12 @@ paths:
 
 - 서비스·워커 테스트는 Spring 없이 생성자로 조립하고, 바깥 의존은 직접 만든 가짜 구현으로 바꾼다. 목을 쓰지 않는다.
 - 목(Mockito)은 컨트롤러 테스트에서 서비스를 대신할 때만 쓴다.
-- 쿼리는 실제 MySQL(`MySqlContainerConfiguration`)에서 실행해 검증한다. `EntityManager`나 Spring Data 리포지토리를 목으로 만들지 않는다. H2를 쓰지 않는다.
+- 쿼리는 실제 PostgreSQL(`PostgreSqlContainerConfiguration`)에서 실행해 검증한다. `EntityManager`나 Spring Data 리포지토리를 목으로 만들지 않는다. H2를 쓰지 않는다.
 - 외부 연동 클라이언트는 가짜 HTTP 서버로 테스트한다. 실제 LLM을 호출하지 않는다.
 
 ## 가짜 구현과 공용 도구
 
-- 가짜 구현은 테스트 파일마다 만들지 않고 test-fixtures에 둔다. `core/src/testFixtures`에는 가짜 구현과 도메인 객체를 만드는 함수, `infra/src/testFixtures`에는 MySQL 컨테이너 설정과 저장소 테스트 도우미를 둔다.
+- 가짜 구현은 테스트 파일마다 만들지 않고 test-fixtures에 둔다. `core/src/testFixtures`에는 가짜 구현과 도메인 객체를 만드는 함수, `infra/src/testFixtures`에는 PostgreSQL 컨테이너 설정과 저장소 테스트 도우미를 둔다.
 - 가짜 구현은 실제 구현의 계약(번호 발급, 유니크 제약 위반, 없는 대상 조회)을 따른다. 테스트 전용 조회 메서드는 둬도 된다.
 - 시각은 `Clock`을 주입받아 고정한다.
 

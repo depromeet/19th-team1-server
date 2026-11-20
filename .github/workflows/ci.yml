@@ -49,7 +49,7 @@ jobs:
             echo "full=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # 포맷 검사(ktlintCheck)와 테스트(Testcontainers MySQL)를 포함한다.
+      # 포맷 검사(ktlintCheck)와 테스트(Testcontainers PostgreSQL)를 포함한다.
       - name: 전체 테스트
         if: steps.scope.outputs.full == 'true'
         run: ./gradlew ktlintCheck build

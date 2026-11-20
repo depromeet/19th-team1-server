@@ -17,7 +17,7 @@ description: Use before opening a PR, after changing docs/, .claude/rules/, API 
 | 4 | `docs/plan/roadmap.md` ↔ GitHub 이슈 | 이슈 번호가 가리키는 이슈의 제목이 스토리와 다른 곳, 담당과 이슈 담당자(assignees)가 다른 곳, 선행과 이슈 본문의 "선행"이 다른 곳, "미등록"인데 같은 제목의 이슈가 있는 곳 |
 | 5 | `docs/plan/stories/` ↔ GitHub 이슈 | 스토리 파일이 있는데 이슈가 닫힌 곳, 파일 머리줄의 이슈 번호가 roadmap과 다른 곳 |
 
-이슈는 `gh issue list --state all --limit 500 --json number,title,state,assignees,body`로 한 번에 받는다. 담당 이름과 GitHub 로그인이 같은 사람인지 확인할 수 없으면 둘 다 적고 질문으로 남긴다.
+이슈는 `gh issue list --state all --limit 500 --json number,title,state,assignees,body`로 한 번에 받는다. 담당 이름은 roadmap "에픽·스토리"의 "담당 표기" 줄로 GitHub 로그인과 맞춰 비교한다. 그 줄에 없는 이름만 질문으로 남긴다.
 
 ## 보고
 

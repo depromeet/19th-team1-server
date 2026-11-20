@@ -24,21 +24,21 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 
 CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. 만드는 조건과 태그 규칙은 [ci.md](ci.md)에 있다.
 
-| 서버 | 받는 이미지 |
+| 이미지 | 용도 |
 | --- | --- |
-| 개발 서버 | `ghcr.io/depromeet/19th-team1-server:develop` |
-| 운영 서버 | `ghcr.io/depromeet/19th-team1-server:main` |
+| `ghcr.io/depromeet/19th-team1-server:develop` | 개발 서버용 (`develop`의 최신) |
+| `ghcr.io/depromeet/19th-team1-server:main` | 운영 서버용 (`main`의 최신) |
 
-- 이미지는 하나다. 컨테이너 안에서 `java org.springframework.boot.loader.launch.JarLauncher`로 실행하고, `app` 사용자(root 아님)로 돈다. 포트는 8080이다.
+- 개발 서버용과 운영 서버용 이미지는 같은 패키지에 태그로 나뉜다. 컨테이너 안에서 `java org.springframework.boot.loader.launch.JarLauncher`로 실행하고, `app` 사용자(root 아님)로 돈다. 포트는 8080이다.
 - 직접 만들 때: `./gradlew :api:bootJar && docker build -t team1-server .`
-- 이미지는 비공개다. 서버에서 처음 한 번 `docker login ghcr.io`로 로그인한다. 비밀번호 자리에는 `read:packages` 권한만 있는 GitHub 토큰을 쓰고, 토큰은 서버에만 둔다.
-- 서버 갱신
+- 패키지가 비공개면 서버에서 처음 한 번 `docker login ghcr.io`로 로그인한다. 비밀번호 자리에는 `read:packages` 권한만 있는 GitHub 토큰을 쓰고, 토큰은 서버에만 둔다.
+- 서버 compose 파일은 이 레포에 없다. 서버 compose에 이 이미지를 쓰는 서비스를 `app`이라는 이름으로 두면, 아래 명령으로 새 이미지를 받아 그 서비스만 다시 띄운다.
 
   ```bash
   docker compose pull app && docker compose up -d --no-deps app
   ```
 
-  서버 compose의 이미지를 `ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:-main}`처럼 두면, `APP_IMAGE_TAG=<브랜치>-<UTC 시각>-<커밋 7자리>`(브랜치 이력 태그, 예: `main-20261120-153000-abc1234`)로 바꿔 같은 명령을 실행해 이전 버전으로 되돌릴 수 있다. 태그 목록은 GHCR 패키지 화면에서 본다.
+  서비스의 이미지를 개발 서버는 `ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:-develop}`, 운영 서버는 `…:${APP_IMAGE_TAG:-main}`처럼 두면, `APP_IMAGE_TAG`에 브랜치 이력 태그(`<브랜치>-<UTC 시각>-<커밋 7자리>`, 예: `main-20261120-153000-abc1234`)를 넣고 같은 명령을 실행해 이전 버전으로 되돌릴 수 있다. 태그 목록은 GHCR 패키지 화면에서 본다.
 
 ## 4. 프로필
 

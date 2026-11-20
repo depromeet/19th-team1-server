@@ -155,59 +155,449 @@ worker      com.depromeet.team1.worker
 
 ## 7. 도메인 모델
 
-방향과 무관하게 필요한 최소 필드만 둔다. 컬럼 상세는 구현 단계에서 확정한다.
+프리런칭 범위의 테이블 12개와 처리 작업 규칙이다. 범위는 `docs/plan/scope.md`를 따른다.
 
-### Item (저장물)
+### 공통 규칙
 
-| 필드 | 설명 |
+- PostgreSQL 16. 테이블 간 FK 제약은 걸지 않고 ID 값으로만 참조한다.
+- 테이블·컬럼은 snake_case 단수 명사형. 시각은 `_at`, 참조는 `단수형_id`.
+- 시각은 모두 `timestamptz`, UTC 저장.
+- 코드값은 DB `ENUM`이 아니라 `varchar` + 앱 enum.
+- PK는 `bigint` identity. 복합 PK인 `member_interest_category`, `message_saved_item`은 예외.
+- 삭제는 소프트 딜리트(`deleted_at`). 탈퇴해도 프리런칭 기간에는 데이터를 보관한다.
+
+### 애그리거트와 테이블
+
+| 애그리거트 | 테이블 | 역할 |
+| --- | --- | --- |
+| 회원 | member | 공통 회원 정보 |
+| 회원 | member_credential | 로그인 수단. 회원 1 : N |
+| 회원 | member_interest_category | 홈에서 고른 관심 카테고리 |
+| 저장물 | saved_item | 링크 한 건과 수집·분석 결과 |
+| 저장물 | saved_item_keyword | 저장물별 주제어 3~5개 |
+| 저장물 | saved_item_embedding | 저장물별 검색 벡터. 1 : 1 |
+| 처리 작업 | processing_job | 수집·분석·임베딩 작업 한 건. SQS 메시지는 이 ID만 나른다 |
+| 대화 | conversation | 꺼내쓰기 대화. 모델은 여러 개를 허용하고, 프리런칭은 회원당 1개만 쓴다 |
+| 메시지 | message | 질문과 답변 |
+| 메시지 | message_saved_item | 답변이 찾아준 저장물. 메시지 1 : N |
+| LLM 사용량 | llm_usage | LLM 호출 한 건의 토큰 |
+| 행동 이벤트 | analytics.behavior_event | `docs/metrics.md`의 이벤트 6개. 도메인 코드가 읽지 않는다 |
+
+### 카테고리와 상세 정보
+
+- 카테고리는 테이블이 없다. `saved_item.category`에 코드 문자열을 넣고, 이름·분류 기준·카테고리별 속성 정의는 `core`의 enum에 둔다.
+- 저장물당 카테고리는 1개다. 여러 관점은 주제어(`saved_item_keyword`)가 맡는다.
+- 카테고리별 상세 정보(장소명, 유효기간 등)는 `saved_item.category_data` jsonb에 둔다. 키 정의와 검증은 코드가 한다.
+- 카테고리 목록과 카테고리별 필드 내용은 `scope.md` 결정 대기 7을 따른다. 바뀌어도 테이블은 그대로이고 enum과 키 정의만 바뀐다.
+
+### ERD
+
+```mermaid
+erDiagram
+    member ||--o{ member_credential : "로그인 수단"
+    member ||--o{ member_interest_category : "관심 카테고리"
+    member ||--o{ saved_item : "저장"
+    saved_item ||--o{ saved_item_keyword : "주제어"
+    saved_item ||--o| saved_item_embedding : "검색 벡터"
+    saved_item ||--o{ processing_job : "처리 작업"
+    member ||--o{ conversation : "대화"
+    conversation ||--o{ message : "메시지"
+    message ||--o{ message_saved_item : "답변 근거"
+    saved_item ||--o{ message_saved_item : "참조됨"
+    member ||--o{ llm_usage : "LLM 호출"
+
+    member {
+        bigint id PK
+        varchar nickname
+        varchar email "NULL"
+        varchar acquisition_channel "NULL"
+        varchar status
+        timestamptz withdrawn_at "NULL"
+    }
+    member_credential {
+        bigint id PK
+        bigint member_id
+        varchar provider
+        varchar provider_user_id "UK WHERE revoked_at IS NULL"
+        timestamptz revoked_at "NULL"
+    }
+    member_interest_category {
+        bigint member_id PK
+        varchar category PK
+    }
+    saved_item {
+        bigint id PK
+        bigint member_id
+        text original_url
+        text normalized_url
+        varchar normalized_url_hash "UK(member_id) WHERE deleted_at IS NULL"
+        varchar platform
+        varchar collect_level
+        varchar memo "NULL"
+        varchar title "NULL"
+        varchar og_image_url "NULL"
+        varchar process_status
+        varchar fail_code "NULL"
+        varchar category "NULL, 코드 enum"
+        varchar category_source "NULL"
+        text summary "NULL"
+        jsonb category_data "NULL"
+        varchar prompt_version "NULL"
+        bigint version
+        timestamptz deleted_at "NULL"
+    }
+    saved_item_keyword {
+        bigint id PK
+        bigint saved_item_id
+        varchar keyword "UK(saved_item_id)"
+        smallint sort_order
+    }
+    saved_item_embedding {
+        bigint saved_item_id PK
+        bigint member_id
+        bytea embedding
+        int dimension
+        varchar embedding_model
+    }
+    processing_job {
+        bigint id PK
+        bigint saved_item_id
+        varchar job_type
+        varchar reason
+        varchar status
+        int attempt_count
+        timestamptz status_changed_at
+    }
+    conversation {
+        bigint id PK
+        bigint member_id
+        varchar title "NULL"
+        timestamptz deleted_at "NULL"
+    }
+    message {
+        bigint id PK
+        bigint conversation_id
+        varchar role
+        text content
+        varchar status
+    }
+    message_saved_item {
+        bigint message_id PK
+        bigint saved_item_id PK
+        smallint sort_order
+    }
+    llm_usage {
+        bigint id PK
+        bigint member_id
+        varchar purpose
+        varchar model
+        int input_tokens
+        int output_tokens
+        bigint processing_job_id "NULL"
+        bigint message_id "NULL"
+    }
+```
+
+모든 선은 FK 없이 ID 값으로만 잇는다. `analytics.behavior_event`는 어떤 테이블도 참조하지 않아 그림에서 뺐다.
+
+| 참조하는 쪽 | 대상 | 관계 | 애그리거트 | 대상이 삭제·탈퇴되면 |
+| --- | --- | --- | --- | --- |
+| member_credential.member_id | member | N : 1 | 같은 애그리거트 | 탈퇴 시 `revoked_at` 기록, 행은 보관 |
+| member_interest_category.member_id | member | N : 1 | 같은 애그리거트 | 보관 |
+| saved_item.member_id | member | N : 1 | 다른 애그리거트(ID 참조) | 탈퇴해도 보관 |
+| saved_item_keyword.saved_item_id | saved_item | N : 1 | 같은 애그리거트 | 재분석 때 교체 |
+| saved_item_embedding.saved_item_id | saved_item | 1 : 1 | 같은 애그리거트 | EMBED가 다시 만듦 |
+| saved_item_embedding.member_id | member | N : 1 | 검색 범위용 중복 값 | |
+| processing_job.saved_item_id | saved_item | N : 1 | 다른 애그리거트 | 진행 중 작업은 `ITEM_DELETED`로 FAILED |
+| conversation.member_id | member | N : 1 | 다른 애그리거트 | 보관 |
+| message.conversation_id | conversation | N : 1 | 다른 애그리거트(메시지는 별도 루트) | |
+| message_saved_item.message_id | message | N : 1 | 같은 애그리거트 | |
+| message_saved_item.saved_item_id | saved_item | N : 1 | 다른 애그리거트 | 화면에 "삭제된 저장물" |
+| llm_usage.member_id / processing_job_id / message_id | member / processing_job / message | N : 1 | 다른 애그리거트 | 보관 |
+| analytics.behavior_event.member_id | (참조 아님) | | 분리 | 단순 값으로 보관 |
+
+### 컬럼
+
+모든 테이블의 `id`(bigint identity PK)는 생략했다. Y = NULL 허용.
+
+#### member
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| nickname | varchar(30) | N | 카카오 닉네임으로 채움 |
+| email | varchar(320) | Y | 카카오 이메일은 선택 동의. 식별에 쓰지 않고 유일 제약 없음 |
+| acquisition_channel | varchar(30) | Y | 가입 경로(지인 소개, 인스타그램, 검색 등). 수집 화면 전까지 NULL |
+| status | varchar(20) | N | `ACTIVE`, `WITHDRAWN` |
+| created_at | timestamptz | N | 가입 시각 |
+| updated_at | timestamptz | N | |
+| withdrawn_at | timestamptz | Y | 탈퇴 시각 |
+
+#### member_credential
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member |
+| provider | varchar(20) | N | `KAKAO` (구글·애플은 값만 추가) |
+| provider_user_id | varchar(100) | N | 제공자 쪽 사용자 ID |
+| created_at | timestamptz | N | 연결 시각 |
+| revoked_at | timestamptz | Y | 탈퇴로 연결을 끊은 시각. 값이 있으면 로그인에 쓰지 않음 |
+
+#### member_interest_category
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | PK(member_id, category). 별도 id 없음 |
+| category | varchar(30) | N | 기본 카테고리 코드 |
+| created_at | timestamptz | N | |
+
+#### saved_item
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member |
+| original_url | text | N | 사용자가 넣은 그대로. 링크를 열 때 씀 |
+| normalized_url | text | N | 외부 호출 없는 문자열 변환(추적 파라미터 제거, 네이버 블로그 주소 변환 등)만 거친 값. 저장 요청 안에서 만들고 이후 바꾸지 않음 |
+| normalized_url_hash | varchar(64) | N | normalized_url의 SHA-256. 중복 판정 인덱스용 |
+| platform | varchar(30) | N | `YOUTUBE`, `NAVER_BLOG`, `INSTAGRAM`, `X` 등. 저장 때 URL 문자열로 판별, 모르면 `OTHER`. 단축 링크는 워커가 최종 주소를 보고 고침 |
+| collect_level | varchar(20) | N | `AUTO`, `PARTIAL`, `LINK_MEMO`(`scope.md` 수집 수준). platform을 고치면 함께 고침 |
+| memo | varchar(200) | Y | 사용자 한 줄 메모. LINK_MEMO 플랫폼에서 분류 재료 |
+| title | varchar(500) | Y | 수집 단계에서 먼저 채움. 처리 중에도 화면에 표시 |
+| og_image_url | varchar(2048) | Y | 원본 대표 이미지 주소. 파일은 복사하지 않음 |
+| process_status | varchar(20) | N | 화면용 `PENDING`, `PROCESSING`, `DONE`, `FAILED`. 최초 처리·재시도만 반영 |
+| fail_code | varchar(30) | Y | 화면 문구용. `TIMEOUT`(다시 시도 가능), `NOT_FOUND`(열리지 않는 링크) 등 |
+| category | varchar(30) | Y | 기본 카테고리 코드. 분류 전 NULL |
+| category_source | varchar(10) | Y | `AI`, `USER`. 분류 전 NULL |
+| summary | text | Y | LLM 핵심 요약. 분석 전 NULL |
+| category_data | jsonb | Y | 카테고리별 상세 정보. 키 정의는 코드. 분석 전·카테고리 수정 직후 NULL |
+| prompt_version | varchar(30) | Y | 분석에 쓴 프롬프트·카테고리 정의 버전 |
+| version | bigint | N | 낙관적 잠금 |
+| created_at | timestamptz | N | 저장 시각. 홈 "최근" 집계 기준 |
+| updated_at | timestamptz | N | |
+| deleted_at | timestamptz | Y | 소프트 딜리트 |
+
+#### saved_item_keyword
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| saved_item_id | bigint | N | 참조 saved_item |
+| keyword | varchar(50) | N | LLM이 뽑은 주제어 |
+| sort_order | smallint | N | LLM이 준 순서 |
+| created_at | timestamptz | N | |
+
+#### saved_item_embedding
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| saved_item_id | bigint | N | PK, 참조 saved_item |
+| member_id | bigint | N | 회원 범위 검색용 중복 보관 |
+| embedding | bytea | N | float32 배열(little-endian). 유사도는 앱에서 계산 |
+| dimension | int | N | 벡터 차원 |
+| embedding_model | varchar(50) | N | |
+| created_at | timestamptz | N | 마지막으로 만든 시각 |
+
+#### processing_job
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| saved_item_id | bigint | N | 참조 saved_item |
+| job_type | varchar(20) | N | `ANALYZE`(수집 + LLM 분석), `EMBED`(임베딩 생성) |
+| reason | varchar(20) | N | `INITIAL`, `CATEGORY_CHANGED`, `RETRY` |
+| status | varchar(20) | N | `PENDING`, `QUEUED`, `RUNNING`, `DONE`, `FAILED` |
+| attempt_count | int | N | 워커가 실행을 시작한 횟수 |
+| last_error_code | varchar(30) | Y | |
+| last_error_detail | varchar(500) | Y | 로그용. 링크 본문·LLM 응답 원문은 넣지 않음 |
+| status_changed_at | timestamptz | N | 멈춘 작업을 찾는 기준 |
+| created_at | timestamptz | N | |
+| completed_at | timestamptz | Y | |
+
+#### conversation
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member |
+| title | varchar(100) | Y | 서버가 만들어 보관. 화면에는 노출하지 않음 |
+| created_at | timestamptz | N | |
+| deleted_at | timestamptz | Y | |
+
+#### message
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| conversation_id | bigint | N | 참조 conversation. 순서는 id 정렬 |
+| role | varchar(20) | N | `USER`, `ASSISTANT` |
+| content | text | N | |
+| status | varchar(20) | N | `GENERATING`, `DONE`, `FAILED`. 사용자 메시지는 항상 `DONE` |
+| created_at | timestamptz | N | |
+
+#### message_saved_item
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| message_id | bigint | N | PK(message_id, saved_item_id). 별도 id 없음 |
+| saved_item_id | bigint | N | 참조 saved_item. 삭제된 저장물이면 화면에 "삭제된 저장물" |
+| sort_order | smallint | N | 관련도순 |
+
+#### llm_usage
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member. 사용자별 상한의 기준 |
+| purpose | varchar(20) | N | `ANALYZE`, `EMBED`, `CHAT` |
+| model | varchar(50) | N | |
+| input_tokens | int | N | |
+| output_tokens | int | N | 임베딩은 0 |
+| processing_job_id | bigint | Y | 분석·임베딩 호출이면 참조 |
+| message_id | bigint | Y | 채팅 호출이면 답변 메시지 참조 |
+| created_at | timestamptz | N | |
+
+#### analytics.behavior_event
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| event_name | varchar(50) | N | `user_active`, `home_viewed`, `home_card_clicked`, `item_viewed`, `item_original_opened`, `chat_question_sent` |
+| member_id | bigint | N | 단순 값. 도메인 테이블과 조인하지 않음 |
+| properties | jsonb | Y | `cardCount`, `entryPath`, `resultCount` |
+| occurred_at | timestamptz | N | 서버 기록 이벤트는 서버 시각 |
+
+### 인덱스와 제약
+
+| 테이블 | 인덱스·제약 | 쓰임 |
+| --- | --- | --- |
+| member_credential | UNIQUE (provider, provider_user_id) WHERE revoked_at IS NULL | 로그인. 탈퇴 후 같은 카카오 계정으로 재가입 가능 |
+| member_credential | (member_id) | 탈퇴 처리 |
+| saved_item | UNIQUE (member_id, normalized_url_hash) WHERE deleted_at IS NULL | 중복 저장 방지. 삭제 후 재저장은 새 행 |
+| saved_item | (member_id, category, created_at DESC, id DESC) WHERE deleted_at IS NULL | 카테고리별 목록, 카테고리별 개수 |
+| saved_item | (member_id, created_at DESC, id DESC) WHERE deleted_at IS NULL | 전체 목록, 처리 중 표시, 홈의 기간 집계 |
+| saved_item_keyword | UNIQUE (saved_item_id, keyword) | 주제어 중복 방지 |
+| saved_item_embedding | (member_id) | 회원 범위 유사도 계산. 벡터 인덱스 없음 |
+| processing_job | (status, status_changed_at) WHERE status IN ('PENDING','QUEUED','RUNNING') | 멈춘 작업 재발행 |
+| processing_job | (saved_item_id, created_at DESC) | 저장물의 최근 작업, 진행 중 작업 확인 |
+| processing_job | UNIQUE (saved_item_id) WHERE job_type = 'ANALYZE' AND status IN ('PENDING','QUEUED','RUNNING') | 저장물당 진행 중인 ANALYZE 작업은 하나. 재시도·카테고리 수정이 동시에 와도 작업이 둘 생기지 않음 (`uk_processing_job_active_analyze`) |
+| conversation | (member_id) | 회원의 대화 |
+| message | (conversation_id, id) | 메시지 순서, 최근 N개 맥락 |
+| message_saved_item | PK (message_id, saved_item_id) | 답변의 결과 카드 |
+| member_interest_category | PK (member_id, category) | 홈 관심 카테고리 |
+| llm_usage | (member_id, created_at) | 사용자별 기간 상한 |
+| llm_usage | (created_at) | 전체 기간 상한 |
+| analytics.behavior_event | (event_name, occurred_at) | 이벤트별 집계 |
+| analytics.behavior_event | (member_id, occurred_at) | 주간 재방문율 |
+
+- ANALYZE 작업 삽입은 `ON CONFLICT (saved_item_id) WHERE job_type = 'ANALYZE' AND status IN ('PENDING','QUEUED','RUNNING') DO NOTHING`. 삽입된 행이 없으면 API가 409.
+- 저장물 삽입은 `ON CONFLICT (member_id, normalized_url_hash) WHERE deleted_at IS NULL DO NOTHING`. 부분 인덱스 조건까지 적어야 동작한다. 삽입된 행이 없으면 처리 작업을 만들지 않고 기존 저장물을 "이미 저장됨"으로 돌려준다.
+- 목록 페이지네이션은 (created_at, id) 커서.
+
+### 처리 작업 상태 전이
+
+SQS는 워커가 작업을 가져오는 방법만 대신한다. 상태·시도 횟수·실패 기록은 `processing_job`에 둔다. 메시지에는 작업 ID만 싣는다.
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: 1 저장·재시도·카테고리 수정
+    PENDING --> QUEUED: 2 발행
+    PENDING --> RUNNING: 3 수신
+    QUEUED --> RUNNING: 3 수신
+    RUNNING --> RUNNING: 3 가시성 제한 시간 초과 후 재수신
+    RUNNING --> DONE: 4 성공
+    RUNNING --> QUEUED: 5 재시도할 수 있는 실패
+    RUNNING --> FAILED: 6 재시도 불가 또는 상한
+    PENDING --> FAILED: 7 DLQ
+    QUEUED --> FAILED: 7 DLQ
+    RUNNING --> FAILED: 7 DLQ
+    DONE --> [*]
+    FAILED --> [*]
+```
+
+상태를 바꾸는 UPDATE는 모두 아래 WHERE 조건을 붙인다. 갱신 0건이면 그 동작은 하지 않고 메시지를 지운다.
+
+| # | 전이 | 누가 | WHERE 조건 | 함께 바꾸는 것 |
+| --- | --- | --- | --- | --- |
+| 1 | 없음 → PENDING | 저장·재시도·카테고리 수정 API | 같은 저장물에 PENDING·QUEUED·RUNNING인 ANALYZE 작업이 없음. 부분 유일 인덱스 + `ON CONFLICT ... DO NOTHING`으로 막고, 삽입되지 않으면 API가 409. EMBED는 이 인덱스 대상이 아님 | 저장물과 한 트랜잭션 |
+| 2 | PENDING → QUEUED | 발행자(커밋 후) | `status = 'PENDING'` | |
+| 3 | PENDING·QUEUED → RUNNING | 워커(메시지 수신) | `status IN ('PENDING','QUEUED')` 또는 `status = 'RUNNING' AND status_changed_at < now() - 가시성 제한 시간` | `attempt_count + 1`, 워커는 올린 값을 자기 차례 번호로 기억. INITIAL·RETRY ANALYZE면 저장물 `process_status = PROCESSING` |
+| 4 | RUNNING → DONE | 워커 | `status = 'RUNNING' AND attempt_count = 내 차례 번호` | 결과 저장, ANALYZE면 EMBED 작업 생성과 저장물 `process_status = DONE`을 한 트랜잭션으로 |
+| 5 | RUNNING → QUEUED | 워커(재시도할 수 있는 실패, 상한 미만) | 4와 같음 | 메시지를 지우지 않아 가시성 제한 시간 뒤 재전송 |
+| 6 | RUNNING → FAILED | 워커(재시도 불가 실패, 또는 attempt_count 상한) | 4와 같음 | 메시지 삭제. INITIAL·RETRY ANALYZE면 저장물 `process_status = FAILED`, `fail_code` |
+| 7 | PENDING·QUEUED·RUNNING → FAILED | DLQ 처리 | `status NOT IN ('DONE','FAILED')` | 원래 오지 않는 경로라 알람도 보냄 |
+| 8 | (상태 그대로) 재발행 | 스케줄러 | PENDING·QUEUED가 N분 넘게 그대로, 또는 RUNNING이 가시성 제한 시간 넘게 그대로 | 메시지가 중복돼도 3번 조건이 하나만 통과시킴 |
+
+- 받은 메시지의 작업이 DONE·FAILED면 아무것도 하지 않고 메시지를 지운다. 저장물이 삭제돼 있으면 작업을 FAILED(`ITEM_DELETED`)로 끝낸다.
+- 실패 판정의 기준은 DB `attempt_count`다. 재발행된 메시지는 SQS 수신 횟수가 0부터 다시 시작한다. SQS 최대 수신 횟수는 DB 상한보다 크게 두고, DLQ는 알람용 안전망이다.
+- 재시도해도 소용없는 실패(404, 지원하지 않는 형식, LLM 사용량 상한 `LLM_LIMIT`)는 바로 FAILED.
+- 가시성 제한 시간 > 수집 타임아웃 + LLM 타임아웃 + 여유. 구체적인 값은 남은 질문 5.
+- 카테고리 수정은 `process_status`가 DONE·FAILED이고 진행 중 ANALYZE 작업이 없을 때만 허용(아니면 409). 재시도 API도 같다. 수정 UPDATE는 `category`, `category_source = USER`를 바꾸고 `category_data`를 NULL로 비운다.
+- 결과 저장은 작업 시작 때 읽은 `version`으로 하는 조건부 UPDATE(`WHERE id = ? AND version = ?`, `version + 1`, `updated_at` 갱신). 저장할 때 엔티티를 새로 읽어 필드를 복사하지 않는다.
+- `version`이 어긋나면 다시 읽어, 삭제됐으면 버리고, 아니면 사용자가 정한 값(`category_source = USER`인 `category`, `memo`)을 빼고 LLM 결과를 반영한다.
+- 임베딩 실패는 저장물 화면 상태를 바꾸지 않는다. 최종 실패하면 스케줄러가 "DONE인데 임베딩 없는 저장물"을 찾아 EMBED를 다시 만든다.
+- 재분석도 링크를 다시 수집한다(본문을 저장하지 않으므로). 카테고리 수정 재분석이 실패해도 `process_status`는 DONE이고 `category_data`만 비어 있다.
+- LLM 사용량은 호출마다 별도 커밋으로 기록한다. 상한은 호출 전 합계로 검사하는 느슨한 상한이다.
+- 생성 후 N분이 지난 GENERATING 메시지는 FAILED로 본다.
+
+### 구현 규칙
+
+- 외부에서 온 값은 저장 전에 자른다(제목 500자, 주제어 50자). 이미지 주소가 2048자를 넘으면 NULL.
+- 주제어 교체: 중복 제거 → 기존 삭제 → flush → 삽입. Hibernate는 한 flush에서 INSERT를 DELETE보다 먼저 실행한다.
+- 카테고리 enum 이름은 배포 후 바꾸지 않는다. 바꾸거나 빼려면 데이터 마이그레이션이 먼저다. 화면 표시 이름은 자유롭게 바꿔도 된다.
+- 임베딩 엔티티 필드는 `ByteArray`. `@Lob`을 쓰지 않는다.
+- 상태 전이와 결과 저장은 저장소 전용 메서드(JPQL 또는 네이티브 UPDATE)로 하고 갱신 행 수를 돌려준다. 네이티브 UPDATE는 `version + 1`, `updated_at`을 직접 넣는다.
+
+### 결정
+
+| # | 결정 | 근거 |
+| --- | --- | --- |
+| 1 | SQS + DB 작업 테이블 | 상태·실패를 DB에 둬야 재발행·화면 상태·재분석 실패 처리를 한 곳에서 푼다 |
+| 2 | 회원 테이블 이름 `member` | `user`는 PostgreSQL 예약어 |
+| 3 | 로그인 수단 `revoked_at` + 부분 유일 | 탈퇴 데이터 보관과 재가입이 충돌하지 않음 |
+| 4 | 카테고리 테이블 없음, 코드 enum | 분류 기준·속성 정의가 코드에 있으니 테이블은 중복. enum 이름은 고정 |
+| 5 | 저장물당 카테고리 1개 | 여러 관점은 주제어가 맡음 |
+| 6 | `category_data` jsonb | 필드가 실험·디자인으로 바뀜. 키 정의는 코드에서 검증 |
+| 7 | 주제어 별도 테이블 | 홈 카드 빈도 집계를 GROUP BY 한 번으로. "주제"가 카테고리로 정해지면 jsonb로 낮춤 |
+| 8 | 홈 카드 결과 저장 안 함 | 회원당 300~400건이라 조회 때 계산 |
+| 9 | URL 해시 부분 유일 + ON CONFLICT | 앱 검사로는 경합을 못 막음 |
+| 10 | 처음 읽은 version으로 조건부 UPDATE | 새로 읽어 복사하면 잠금이 무력해짐 |
+| 11 | 화면 상태는 최초 처리·재시도만 | 재분석 실패가 멀쩡한 저장물을 실패로 만들지 않게 |
+| 12 | `fail_code` | "다시 시도"와 "열리지 않는 링크" 구분 |
+| 13 | 플랫폼·수집 수준·메모 | `scope.md` 프리런칭 범위. 플랫폼은 워커가 고칠 수 있음 |
+| 14 | 썸네일은 `og_image_url`만 | 저장 정책은 `scope.md` 결정 대기 3 |
+| 15 | 저장 시점 정규화는 문자열 변환만 | 응답 시간과 유일 인덱스. 단축·긴 주소 중복은 감수 |
+| 16 | 임베딩 bytea, 앱 계산 | 회원당 수백 건. pgvector는 필요할 때 |
+| 17 | `prompt_version` | 옛 기준 행만 골라 재분석 |
+| 18 | `llm_usage` 별도 커밋, 느슨한 상한 | 롤백돼도 쓴 토큰이 남아야 함 |
+| 19 | 답변 참조는 테이블 | 저장물의 현재 제목·이미지를 조인 |
+| 20 | 메시지 `seq` 없음 | id 정렬로 충분 |
+| 21 | 대화 모델은 여러 개, 프리런칭은 회원당 1개 | 지난 대화 목록이 생겨도 테이블은 그대로. 제목은 보관만 |
+| 22 | `analytics` 스키마, 이벤트 6개 | 도메인이 조인하지 않는다는 규칙을 구조로 |
+| 23 | `acquisition_channel` | 가입 경로를 받을 예정 |
+| 24 | `created_at`·`status` 통일 | 시각·상태 컬럼 이름을 하나로 |
+| 25 | 소프트 딜리트 | `scope.md` 탈퇴·삭제 데이터 보관 |
+| 26 | 모든 상태 전이에 WHERE 조건 | 늦은 갱신·중복 메시지가 상태를 덮지 않게 |
+| 27 | 실패 판정은 attempt_count | SQS 수신 횟수는 재발행 때 초기화 |
+| 28 | 처리 중 카테고리 수정은 409 | PROCESSING에 갇히는 경로 차단 |
+| 29 | 임베딩 실패는 재생성 | 완료로 보이는데 검색 안 되는 저장물 방지 |
+| 30 | saved_item 컬럼 최소화 | item_type, resolved_url, description, site_name, categorized_at, analysis_model, analyzed_at은 두지 않음. 필요하면 컬럼 추가 |
+
+### 이번에 넣지 않은 것
+
+| 항목 | 들어올 때 |
 | --- | --- |
-| id, userId | 소유자 |
-| importBatchId | 어느 가져오기에서 들어왔는지 (단건 추가는 null) |
-| sourceType | `IMAGE` / `LINK` |
-| sourceRef | 이미지면 저장소 키, 링크면 URL |
-| title, summary | 분석 결과 (처리 전에는 null) |
-| attributes | 방향별 추가 정보를 담는 JSON 확장 칸. 방향 확정 후 정식 컬럼으로 올린다 |
-| status | `PENDING` → `PROCESSING` → `DONE` / `FAILED` |
-| createdAt, processedAt | |
+| 카톡 일괄 가져오기 | 묶음 테이블(총·중복 건수), saved_item에 묶음 ID·원래 저장 시각 |
+| 썸네일 복사 | `thumbnail_key`, S3·Lambda 파이프라인 |
+| 이미지 저장물 | `item_type`(기본값 LINK) 추가, URL 컬럼 NULL 허용, 이미지 키 컬럼 |
+| 개인 카테고리 | 개인 카테고리 테이블, saved_item에 개인 카테고리 ID·출처 |
+| 알림 발송·수신 설정·기기 | E7 착수 때 설계 |
+| 약관 동의 이력 | 약관 종류·버전·동의 시각 테이블 |
+| 화면 이벤트 수집 | 클라이언트 이벤트 ID, 수신 시각 |
+| 외부용 ID | 공유가 생기면 공유 테이블 |
+| 회원별 동시 처리 제한 | `processing_job.member_id` |
 
-- **주제** `[제안]`: 별도 테이블 `item_topic(item_id, name)`. 사용자 단위 주제 집계를 SQL로 바로 할 수 있다.
+### 남은 질문
 
-### ImportBatch (가져오기 묶음)
-
-| 필드 | 설명 |
-| --- | --- |
-| id, userId | |
-| totalCount, doneCount, failedCount | 진행률과 첫 결과 화면의 근거 |
-| createdAt, completedAt | |
-
-### ProcessingJob (처리 작업)
-
-| 필드 | 설명 |
-| --- | --- |
-| id, itemId, jobType | 어떤 저장물에 어떤 작업을 할지 |
-| status | `READY` / `RUNNING` / `DONE` / `FAILED` |
-| attemptCount, maxAttempts | 재시도 횟수 |
-| nextRunAt | 다음 실행 시각 (재시도 시 뒤로 미룸) |
-| lockedAt | 실행을 시작한 시각. 오래 `RUNNING`인 작업을 회수하는 기준 |
-| lastError | 마지막 실패 사유 |
-
-### ViewLog (열람 로그)
-
-| 필드 | 설명 |
-| --- | --- |
-| id, userId, itemId | |
-| entryPath | `NOTIFICATION` / `SEARCH` / `LIST` |
-| viewedAt | |
-
-- **자발 재열람** = `entryPath`가 `SEARCH` 또는 `LIST`인 열람. 지표 정의를 코드 한 곳에 둔다.
-
-### User
-
-- 최소 필드만 둔다. 로그인 수단은 인증 방식 확정 후 별도 테이블로 붙인다.
-
-### LlmUsage (LLM 사용 기록)
-
-- 호출 단위로 사용자·용도·토큰 수를 기록한다. 상한 검사의 근거 데이터다.
+| # | 질문 | 누구와 | 테이블 영향 |
+| --- | --- | --- | --- |
+| 1 | 홈 관심사 카드의 "주제"는 주제어 묶음인가, 카테고리인가 | 디자인 | 카테고리면 saved_item_keyword → jsonb 컬럼 |
+| 2 | 메모를 저장 뒤에도 고칠 수 있나 | 디자인 | 고치면 LINK_MEMO에서만 재분석 |
+| 3 | LINK_MEMO 메모를 저장 전에 받나 | 디자인 | 단축 링크는 저장 뒤 메모 요청 |
+| 4 | 처리 중 카테고리 수정 버튼을 화면이 막아 주나 | 디자인·웹 | 없음 (서버는 409) |
+| 5 | SQS 가시성 제한 시간, 최대 수신 횟수, DB 재시도 상한, 재발행 N분, GENERATING 만료 N분 값 | 서버 | 없음 (설정값) |
 
 ## 8. 확장 지점
 

@@ -168,6 +168,32 @@ class AuthTokenTest {
     }
 
     @Test
+    fun `탈퇴한 회원의 리프레시 토큰은 거절하고 그 회원의 토큰을 모두 지운다`() {
+        val login = login()
+        login("other-device")
+        withdraw(login.memberId)
+
+        val error = assertFailsWith<AppException> { authService.reissue(login.tokens.refreshToken) }
+
+        assertEquals(AuthError.AUTH_INVALID_REFRESH_TOKEN, error.errorCode)
+        assertTrue(refreshTokenRepository.findAll(login.memberId).isEmpty())
+    }
+
+    @Test
+    fun `탈퇴한 회원이면 재발급에 쓰인 지 유예 시간 안의 토큰도 거절한다`() {
+        val login = login()
+        authService.reissue(login.tokens.refreshToken)
+        withdraw(login.memberId)
+
+        val error = assertFailsWith<AppException> {
+            authServiceAt(NOW.plusSeconds(5)).reissue(login.tokens.refreshToken)
+        }
+
+        assertEquals(AuthError.AUTH_INVALID_REFRESH_TOKEN, error.errorCode)
+        assertTrue(refreshTokenRepository.findAll(login.memberId).isEmpty())
+    }
+
+    @Test
     fun `만료된 리프레시 토큰은 거절한다`() {
         val login = login()
         val expired = NOW.plus(Duration.ofDays(14))
@@ -233,6 +259,11 @@ class AuthTokenTest {
     private fun login(code: String = "code"): LoginResult {
         kakao.register(code, OAuthUser(AuthProvider.KAKAO, "kakao-1", "나현", null))
         return authService.login(AuthProvider.KAKAO, code)
+    }
+
+    private fun withdraw(memberId: Long) {
+        val member = memberRepository.findById(memberId)!!
+        memberRepository.save(member.copy(status = MemberStatus.WITHDRAWN, withdrawnAt = NOW, updatedAt = NOW))
     }
 
     /** 토큰 행이 남아 있고 폐기되지 않았다. */

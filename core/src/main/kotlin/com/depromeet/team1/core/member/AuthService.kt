@@ -58,7 +58,7 @@ class AuthService(
      * 리프레시 토큰으로 새 토큰 쌍을 발급하고 쓴 토큰은 폐기한다(로테이션, revoked_at 기록).
      * 로테이션으로 폐기된 토큰이 다시 오면, 폐기된 지 유예 시간([AuthSettings.refreshTokenReuseGrace]) 안이면
      * 동시 재발급으로 보고 새 토큰 쌍을 주고, 지났으면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운 뒤 거절한다.
-     * 로그아웃·탈취 감지로 지워진 토큰은 모르는 토큰과 같게 거절한다.
+     * 로그아웃·탈취 감지로 지워진 토큰은 모르는 토큰과 같게 거절한다. 탈퇴한 회원이면 그 회원의 토큰을 모두 지우고 거절한다.
      *
      * 트랜잭션을 걸지 않는다. 탈취 감지의 일괄 삭제는 거절 예외와 함께 롤백되면 안 되므로 저장소 메서드가 각각 커밋한다.
      * 폐기 뒤 새 토큰 저장이 실패하면 사용자는 다시 로그인한다.
@@ -66,6 +66,7 @@ class AuthService(
     fun reissue(refreshToken: String): IssuedTokens {
         val now = clock.instant()
         val stored = refreshTokenRepository.findByTokenHash(hash(refreshToken)) ?: throw unknownRefreshToken()
+        rejectIfWithdrawn(stored.memberId)
         if (stored.revokedAt != null) return reissueRotated(stored, now)
         rejectIfExpired(stored, now)
         // 같은 토큰으로 동시에 재발급하면 조건부 폐기가 하나만 통과시킨다. 진 쪽은 다시 읽어 로테이션된 토큰의 규칙을 적용한다.
@@ -94,6 +95,16 @@ class AuthService(
         }
         rejectIfExpired(stored, now)
         return issueTokens(stored.memberId, now)
+    }
+
+    /** 탈퇴 처리에서 토큰을 지우지 못했더라도 탈퇴한 회원에게 토큰을 주지 않는다. */
+    private fun rejectIfWithdrawn(memberId: Long) {
+        if (memberRepository.findById(memberId)?.status == MemberStatus.ACTIVE) return
+        val deleted = refreshTokenRepository.deleteAllByMemberId(memberId)
+        throw AppException(
+            AuthError.AUTH_INVALID_REFRESH_TOKEN,
+            "탈퇴했거나 없는 회원의 리프레시 토큰 memberId=$memberId, 토큰 ${deleted}개 삭제",
+        )
     }
 
     private fun rejectIfExpired(stored: RefreshToken, now: Instant) {

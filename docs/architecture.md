@@ -661,6 +661,7 @@ stateDiagram-v2
 | `ItemAnalyzer` | 저장물 → 요약·카테고리·주제어 | 텍스트 LLM 분석기 |
 | `LlmClient` | LLM 호출 | 선택한 LLM 벤더 클라이언트 (결정 대기 10) |
 | `JobQueue` | 작업 발행·받기·메시지 삭제 | SQS |
+| `JobHandler` | 작업 종류(ANALYZE, EMBED)별 수행. 외부 호출만 하고 저장할 것은 결과로 돌려준다. 작업 완료와 결과 저장은 서비스가 한 트랜잭션으로 묶는다 | E4-6(`ANALYZE`), E6-2(`EMBED`)에서 만든다. 둘 곳은 그때 정한다 |
 | `LinkContentFetcher` | 링크 본문·메타데이터 수집 | 플랫폼별 HTTP 수집기 |
 | `NotificationSender` | 알림 발송 | 채널별 구현. 웹 푸시 구현은 두지 않는다 |
 

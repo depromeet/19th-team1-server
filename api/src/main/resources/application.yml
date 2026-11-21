@@ -28,6 +28,32 @@ spring:
 # 여기에 ${...} 로 적지 않는다. 값이 없을 때 자리표시자 문자열이 그대로 들어가 비어 있는지 검사할 수 없다.
 # 비어 있으면 dev·prod 는 기동하지 않고, local 은 경고를 남기고 뜬 뒤 로그인 요청만 실패한다(KakaoConfiguration).
 
+# 처리 작업과 작업 큐(docs/deployment.md 6절). 기본값은 운영 값을 정하기 전의 임시 값이다.
+job:
+  queue:
+    url: ${SQS_QUEUE_URL}
+    region: ${SQS_REGION}
+    # 로컬에서 ElasticMQ 주소를 넣는다. 비우면 AWS SQS 에 붙는다.
+    endpoint: ${SQS_ENDPOINT:}
+  # DB 시도 횟수 상한. 이 횟수째 실행이 실패하면 FAILED 로 끝낸다.
+  max-attempts: ${JOB_MAX_ATTEMPTS:3}
+  # 받은 메시지의 가시성 제한 시간이자 RUNNING 작업을 멈춘 것으로 보는 시간. 링크 수집 + LLM 타임아웃보다 길게 둔다.
+  visibility-timeout: ${JOB_VISIBILITY_TIMEOUT:PT5M}
+  # 이보다 오래 PENDING·QUEUED 인 작업을 다시 발행한다.
+  republish-after: ${JOB_REPUBLISH_AFTER:PT10M}
+  republish-interval: PT5M
+  republish-batch-size: 100
+
+worker:
+  # 작업 큐 받기 루프를 켠다.
+  enabled: ${WORKER_ENABLED:true}
+  # 동시에 처리하는 작업 수.
+  concurrency: ${WORKER_CONCURRENCY:4}
+
+scheduler:
+  # 예약 작업(멈춘 작업 재발행)을 켠다.
+  enabled: ${SCHEDULER_ENABLED:true}
+
 management:
   endpoints:
     web:

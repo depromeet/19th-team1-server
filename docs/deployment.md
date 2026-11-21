@@ -7,7 +7,7 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 | 항목 | 버전 | 비고 |
 | --- | --- | --- |
 | JDK | 25 | 로컬에 없으면 Gradle이 자동으로 내려받는다 |
-| Docker | Compose v2 | 로컬 PostgreSQL과 테스트(Testcontainers)에 필요하다 |
+| Docker | Compose v2 | 로컬 PostgreSQL·ElasticMQ와 테스트(Testcontainers)에 필요하다 |
 
 ## 2. 빌드
 
@@ -15,7 +15,7 @@ CI/CD와 서버 구성이 참고하는 애플리케이션 쪽 전제를 정리�
 ./gradlew build
 ```
 
-- 테스트가 PostgreSQL 컨테이너를 띄우므로 빌드하는 곳에 Docker가 있어야 한다.
+- 테스트가 PostgreSQL·ElasticMQ 컨테이너를 띄우므로 빌드하는 곳에 Docker가 있어야 한다.
 - 산출물은 `api/build/libs/` 아래 실행 jar 하나다.
 - 실행: `java -jar api/build/libs/api-0.0.1-SNAPSHOT.jar`
 - 상태 확인: `GET /actuator/health`. 정상이면 200과 `{"status":"UP"}`을 돌려준다. 배포 후 확인과 외부 상태 점검에 쓴다.
@@ -65,6 +65,16 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | `KAKAO_REDIRECT_URI` | 앱 | 카카오 로그인 리다이렉트 URI. 카카오 개발자 콘솔에 등록한 값과 같아야 한다 |
 | `JWT_SECRET` | 앱 | 액세스 토큰 서명 키(HS256). Base64 로 32바이트 이상. 비어 있으면 `dev`·`prod`는 뜨지 않고, `local`은 임시 키로 뜬다(재시작하면 토큰 무효). 바꾸면 발급한 액세스 토큰이 모두 무효가 된다 |
 | `AUTH_REFRESH_TOKEN_REUSE_GRACE` | 앱(선택) | 폐기된 리프레시 토큰이 이 시간 안에 다시 오면 동시 재발급으로 보고 거절만 한다. 지나서 오면 탈취로 보고 그 회원의 리프레시 토큰을 모두 폐기한다. 기본 `30s` |
+| `SQS_QUEUE_URL` | 서버 | 작업 큐 URL. 로컬 기본값은 ElasticMQ의 `team1-jobs` |
+| `SQS_REGION` | 서버 | 작업 큐 리전. 로컬 기본값은 `ap-southeast-2` |
+| `SQS_ENDPOINT` | 로컬 | SQS 호환 서버 주소. 있으면 그 주소에 자격 증명 없이 붙는다. 서버에서는 비운다 |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | 서버(인스턴스 역할이 없을 때) | SQS 자격 증명. AWS SDK가 기본 순서(환경변수, 인스턴스 역할 등)로 찾는다 |
+| `JOB_MAX_ATTEMPTS` | 앱(선택) | DB 시도 횟수 상한. 기본 3 |
+| `JOB_VISIBILITY_TIMEOUT` | 앱(선택) | 받은 메시지의 가시성 제한 시간이자 실행 중인 작업을 멈춘 것으로 보는 시간. ISO-8601(`PT5M`). 기본 5분 |
+| `JOB_REPUBLISH_AFTER` | 앱(선택) | 이보다 오래 PENDING·QUEUED인 작업을 다시 발행한다. ISO-8601. 기본 10분 |
+| `WORKER_ENABLED` | 앱(선택) | 작업 큐 받기 루프를 켠다. 기본 `true` |
+| `WORKER_CONCURRENCY` | 앱(선택) | 동시에 처리하는 작업 수. 기본 4 |
+| `SCHEDULER_ENABLED` | 앱(선택) | 예약 작업(멈춘 작업 재발행)을 켠다. 기본 `true` |
 
 기능이 추가되면 이 표에 함께 추가한다.
 
@@ -83,14 +93,17 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | 경보 | DLQ에 메시지가 생기면 CloudWatch 경보 | 원래 오지 않는 경로다 |
 | 권한 | 앱 전용 자격 증명에 작업 큐의 발행·받기·삭제만 | DLQ는 사람이 콘솔에서 본다 |
 
-- 가시성 제한 시간, 최대 수신 횟수, DB 재시도 상한, 재발행 대기 시간의 구체적인 값과 큐 이름, 리전, 자격 증명의 환경변수 이름은 정하지 않았다. 정하면 이 절과 5절 표에 적는다.
-- 로컬과 테스트에서는 SQS 호환 서버 ElasticMQ를 쓴다. Docker Compose와 Testcontainers 구성은 아직 없다.
+- 설정의 환경변수 이름은 5절 표에 있다. 가시성 제한 시간, DB 재시도 상한, 재발행 대기 시간은 임시 기본값만 두었다. 최대 수신 횟수와 큐 이름, 운영 값은 정하지 않았다. 정하면 이 절과 5절 표에 적는다.
+- 가시성 제한 시간은 앱이 메시지를 받을 때 직접 지정한다(`JOB_VISIBILITY_TIMEOUT`). 실행 중인 작업을 멈춘 것으로 보는 시간과 같은 값이라 둘이 어긋나지 않는다.
+- 가시성 제한 시간은 링크 수집 타임아웃 + LLM 타임아웃 합보다 길어야 한다. 현재 기본값은 5분이다.
+- 재발행은 5분마다 돈다. 한 번에 100개까지 다룬다.
+- 로컬은 `docker compose`의 ElasticMQ(큐 `team1-jobs`, `docker/elasticmq.conf`)를 쓰고, 테스트는 Testcontainers로 ElasticMQ를 띄운다.
 
 ## 7. 로컬 실행
 
 ```bash
 cp .env.example .env        # 처음 한 번. 비밀번호 칸을 채운다
-docker compose up -d        # PostgreSQL
+docker compose up -d        # PostgreSQL, 작업 큐(ElasticMQ)
 ./gradlew :api:bootRun      # 앱 (local 프로필)
 ```
 

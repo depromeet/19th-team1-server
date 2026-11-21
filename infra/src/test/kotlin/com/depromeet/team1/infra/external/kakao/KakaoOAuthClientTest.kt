@@ -22,8 +22,13 @@ class KakaoOAuthClientTest {
     @BeforeEach
     fun setUp() {
         server.start()
+        // 응답 타임아웃은 본문을 다 읽을 때까지 걸린다. 첫 호출의 JSON 변환기 초기화가 느린 CI 에서도 넘지 않게 넉넉히 둔다.
+        client = clientWithReadTimeout(Duration.ofSeconds(5))
+    }
+
+    private fun clientWithReadTimeout(readTimeout: Duration): KakaoOAuthClient {
         val baseUrl = server.url("/").toString().removeSuffix("/")
-        client = KakaoOAuthClient(
+        return KakaoOAuthClient(
             KakaoProperties(
                 clientId = "test-client-id",
                 clientSecret = "test-client-secret",
@@ -31,7 +36,7 @@ class KakaoOAuthClientTest {
                 authBaseUrl = baseUrl,
                 apiBaseUrl = baseUrl,
                 connectTimeout = Duration.ofMillis(500),
-                readTimeout = Duration.ofMillis(300),
+                readTimeout = readTimeout,
             ),
         )
     }
@@ -121,8 +126,9 @@ class KakaoOAuthClientTest {
                 .body("""{"access_token":"kakao-access"}""")
                 .build(),
         )
+        val impatientClient = clientWithReadTimeout(Duration.ofMillis(300))
 
-        val error = assertFailsWith<AppException> { client.fetchUser("auth-code") }
+        val error = assertFailsWith<AppException> { impatientClient.fetchUser("auth-code") }
 
         assertEquals(AuthError.AUTH_OAUTH_UNAVAILABLE, error.errorCode)
     }

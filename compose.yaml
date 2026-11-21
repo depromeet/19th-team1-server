@@ -1,4 +1,4 @@
-# 로컬 개발용 PostgreSQL. 값은 레포 루트의 .env 에서 읽는다 (cp .env.example .env).
+# 로컬 개발용 PostgreSQL 과 작업 큐(ElasticMQ). PostgreSQL 값은 레포 루트의 .env 에서 읽는다 (cp .env.example .env).
 services:
   postgres:
     image: postgres:16
@@ -17,6 +17,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # SQS 호환 작업 큐. 큐는 docker/elasticmq.conf 에 정의한다.
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.7.1
+    container_name: team1-elasticmq
+    ports:
+      - "127.0.0.1:9324:9324"
+    volumes:
+      - ./docker/elasticmq.conf:/opt/elasticmq.conf:ro
 
 volumes:
   postgres-data:

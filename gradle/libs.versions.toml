@@ -4,8 +4,11 @@ spring-boot = "4.1.2"
 ktlint-gradle = "14.2.0"
 archunit = "1.5.0"
 springdoc = "3.2.0"
+# AWS SDK 는 Spring Boot BOM 에 없어 자체 BOM 으로 버전을 맞춘다.
+aws-sdk = "2.59.7"
 
 [libraries]
+aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
 springdoc-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 

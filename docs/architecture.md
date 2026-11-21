@@ -661,13 +661,13 @@ stateDiagram-v2
 | `OAuthClient` | 소셜 로그인 인가 코드 → 제공자 사용자 정보 | 제공자별 구현. 지금은 카카오만 (구글은 결정 대기 5) |
 | `AccessTokenIssuer` | 액세스 토큰 발급 | HS256 JWT. 검증은 같은 키의 `JwtDecoder` 빈으로 api 의 Resource Server 가 한다 |
 | `ItemAnalyzer` | 저장물 → 요약·카테고리·주제어 | 텍스트 LLM 분석기 |
-| `LlmClient` | LLM 호출 | 선택한 LLM 벤더 클라이언트 (결정 대기 10) |
+| `LlmClient` | LLM 텍스트 생성 | 벤더별 구현을 하나만 띄운다. 지금은 Gemini(`external/llm/gemini`). 모델이 정해지면(결정 대기 10) 그 벤더 구현을 더한다 |
 | `JobQueue` | 작업 발행·받기·메시지 삭제 | SQS |
 | `JobHandler` | 작업 종류(ANALYZE, EMBED)별 수행. 외부 호출만 하고 저장할 것은 결과로 돌려준다. 작업 완료와 결과 저장은 서비스가 한 트랜잭션으로 묶는다 | E4-6(`ANALYZE`), E6-2(`EMBED`)에서 만든다. 둘 곳은 그때 정한다 |
 | `LinkContentFetcher` | 링크 본문·메타데이터 수집 | 플랫폼별 HTTP 수집기 |
 | `NotificationSender` | 알림 발송 | 채널별 구현. 웹 푸시 구현은 두지 않는다 |
 
-- **LLM 사용량 상한**(`core`의 `LlmUsageGuard`): 호출 전에 검사한다. 사용자별 상한과 전체 상한을 따로 둔다. 상한에 걸린 처리 작업은 재시도하지 않고 실패로 끝낸다(아래 비동기 처리 흐름).
+- **LLM 사용량 상한**(`core`의 `LlmUsageGuard`): LLM 호출은 `LlmService`를 거친다. 상한 검사 → 호출 → 사용량 기록 순서다. 사용자별 상한과 전체 상한을 따로 두고, 단위는 하루(한국 시간 자정 기준)의 입력·출력 토큰 합이다. 넘으면 호출하지 않고 `LLM_LIMIT_EXCEEDED`를 던진다. 벤더 호출 한도 초과(429)는 `LLM_RATE_LIMITED`, 그 밖의 호출 실패는 `LLM_UNAVAILABLE`로 구분한다. 응답에 텍스트가 없어도 사용량이 왔으면 쓴 토큰을 기록한 뒤 `LLM_UNAVAILABLE`로 끝낸다. 상한에 걸린 처리 작업은 재시도하지 않고 실패로 끝낸다(아래 비동기 처리 흐름).
 - **현재 사용자**: 컨트롤러는 `@CurrentMemberId memberId: Long`으로 "현재 사용자 ID"만 받는다. 해석은 `api`의 `web/common/CurrentMemberIdArgumentResolver` 한 곳에서 액세스 토큰의 회원 번호(sub)로 한다. 프로필별 헤더 방식은 두지 않는다. `local`도 카카오 로그인으로 토큰을 받는다.
 - **인증**: 웹은 `Authorization: Bearer <액세스 토큰>`으로 요청한다. 검증은 Spring Security Resource Server(`api/config/SecurityConfig`)가 infra 의 `JwtDecoder` 빈으로 한다. `/actuator/health`, Swagger, `POST /api/v1/auth/**`(로그인·재발급·로그아웃)만 토큰 없이 부르고, 인증 API 에서는 Authorization 헤더를 읽지 않는다. 인증 실패는 401 이고, 만료는 `AUTH_TOKEN_EXPIRED`, 없음·위조는 `AUTH_UNAUTHORIZED`다(`web/common/AuthenticationErrorEntryPoint`). 웹은 만료 코드를 받으면 재발급하고, 재발급이 `AUTH_INVALID_REFRESH_TOKEN`이면 재로그인을 안내한다. 재발급으로 폐기된 리프레시 토큰이 다시 오면, 폐기된 지 유예 시간(기본 30초, `AUTH_REFRESH_TOKEN_REUSE_GRACE`) 안이면 동시 재발급으로 보고 새 토큰 쌍을 주고, 지났으면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운 뒤 401 이다. 로그아웃하면 그 토큰 행을 지우고, 지워진 토큰은 모르는 토큰과 같게 401 이다. 탈퇴한 회원의 리프레시 토큰이 오면 그 회원의 토큰을 모두 지우고 401 이다.
 - **꺼내기**: 홈 관심사 카드와 채팅 검색이다. 둘 다 저장물 조회와 열람 로그 기록을 공통으로 쓴다. 채팅 검색의 임베딩은 PostgreSQL에 `bytea`로 저장하고 유사도는 앱에서 계산한다.

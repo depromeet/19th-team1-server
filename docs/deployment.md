@@ -79,6 +79,11 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | `WORKER_ENABLED` | 앱(선택) | 작업 큐 받기 루프를 켠다. 기본 `true` |
 | `WORKER_CONCURRENCY` | 앱(선택) | 동시에 처리하는 작업 수. 기본 4 |
 | `SCHEDULER_ENABLED` | 앱(선택) | 예약 작업(멈춘 작업 재발행)을 켠다. 기본 `true` |
+| `GEMINI_API_KEY` | 앱, 서버 | LLM(Gemini) API 키. 비어 있으면 `dev`·`prod`는 뜨지 않고, `local`은 경고를 남기고 떠서 LLM 호출만 실패한다 |
+| `GEMINI_MODEL` | 앱(선택) | Gemini 모델 이름. 기본 `gemini-3.5-flash-lite` |
+| `LLM_TIMEOUT` | 앱(선택) | LLM 응답 타임아웃. ISO-8601. 기본 60초. 링크 수집 타임아웃과 합쳐도 `JOB_VISIBILITY_TIMEOUT`보다 짧게 둔다 |
+| `LLM_MEMBER_DAILY_TOKEN_LIMIT` | 앱(선택) | 한 사용자가 하루(한국 시간 자정 기준)에 쓸 수 있는 LLM 입력·출력 토큰 합. 넘으면 호출하지 않는다. 기본 1,000,000(임시값) |
+| `LLM_GLOBAL_DAILY_TOKEN_LIMIT` | 앱(선택) | 모든 사용자가 하루에 쓸 수 있는 LLM 입력·출력 토큰 합. 기본 5,000,000(임시값) |
 
 기능이 추가되면 이 표에 함께 추가한다.
 

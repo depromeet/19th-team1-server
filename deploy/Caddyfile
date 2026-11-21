@@ -1,0 +1,4 @@
+# SITE_ADDRESS 는 deploy/compose.yaml 이 .env 에서 받아 넘긴다. 호스트 이름을 주면 HTTPS 인증서를 자동으로 받는다.
+{$SITE_ADDRESS} {
+	reverse_proxy app:8080
+}

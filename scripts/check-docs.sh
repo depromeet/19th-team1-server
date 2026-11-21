@@ -88,7 +88,7 @@ check_removed_terms() {
   done
 }
 
-# 코드(application*.yml, compose.yaml)에서 ${이름} 으로 쓰는 환경변수가 docs/deployment.md 표와 .env.example 에
+# 코드(application*.yml, compose.yaml, deploy/compose.yaml)에서 ${이름} 으로 쓰는 환경변수가 docs/deployment.md 표와 .env.example 에
 # 모두 있는지. 코드 → 문서 방향만 본다. 문서에만 있는 이름(SPRING_PROFILES_ACTIVE 등)은 검사하지 않는다.
 check_env_vars() {
   local doc=docs/deployment.md example=.env.example documented examples hit name
@@ -101,7 +101,7 @@ check_env_vars() {
     name="${hit##*\$\{}"
     grep -qxF "$name" <<<"$documented" || report "환경변수" "${hit%:*} → $name 이 $doc 표에 없음"
     grep -qxF "$name" <<<"$examples" || report "환경변수" "${hit%:*} → $name 이 $example 에 없음"
-  done < <(git grep -n -oE '\$\{[A-Z][A-Z0-9_]*' -- '*application*.yml' '*application*.yaml' 'compose.yaml' 'compose.yml' |
+  done < <(git grep -n -oE '\$\{[A-Z][A-Z0-9_]*' -- '*application*.yml' '*application*.yaml' 'compose.yaml' 'compose.yml' 'deploy/compose.yaml' |
     awk -F: '{ n = $NF; sub(/^\$\{/, "", n); if (!(n in seen)) { seen[n] = 1; print } }' || true)
 }
 

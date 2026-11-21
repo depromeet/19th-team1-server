@@ -1,0 +1,70 @@
+# 개발·운영 서버용. 두 서버가 이 파일을 그대로 쓰고, 차이는 같은 폴더의 .env 로만 준다(docs/deployment.md 7절).
+# 서버에서는 /srv/team1 에 이 파일, Caddyfile, .env 를 두고 그 폴더에서 실행한다.
+#
+# 배포는 `docker compose pull app && docker compose up -d` 만 쓴다. `docker compose down` 은 쓰지 않는다.
+# down 은 모든 컨테이너를 지워 DB·Caddy까지 멈추고, -v 를 붙이면 인증서 볼륨이 지워진다.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: "5"
+
+services:
+  app:
+    image: ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:?.env 에 APP_IMAGE_TAG 를 설정하세요 (개발 develop, 운영 main)}
+    env_file: .env
+    environment:
+      # DB 는 같은 Compose 의 postgres 서비스다. .env 의 DB_URL 은 쓰지 않는다.
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:?.env 에 DB_NAME 을 설정하세요}
+      # 컨테이너 메모리 상한(768MB)의 55%, 약 420MB 를 힙 상한으로 둔다. 나머지는 메타스페이스·스레드·버퍼 몫이다.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=55
+    mem_limit: 768m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${DB_NAME:?.env 에 DB_NAME 을 설정하세요}
+      POSTGRES_USER: ${DB_USERNAME:?.env 에 DB_USERNAME 을 설정하세요}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?.env 에 DB_PASSWORD 를 설정하세요}
+      TZ: UTC
+    # 앱 풀(Hikari 기본 10) + 백업·수동 접속 여유.
+    command: ["postgres", "-c", "max_connections=30"]
+    mem_limit: 640m
+    # 포트를 바깥에 열지 않는다. 접속은 서버에서 `docker compose exec postgres psql` 로 한다.
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  # HTTPS 종단. SITE_ADDRESS 로 받은 호스트의 인증서를 자동으로 발급·갱신하고 app:8080 으로 넘긴다.
+  caddy:
+    image: caddy:2
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?.env 에 SITE_ADDRESS 를 설정하세요}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  # 발급받은 인증서. 지우면 다시 발급받는데, 짧은 시간에 반복하면 발급 횟수 제한에 걸린다.
+  caddy-data:
+  caddy-config:

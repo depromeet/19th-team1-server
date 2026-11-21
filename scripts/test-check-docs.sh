@@ -120,12 +120,16 @@ new_repo env
 printf '  llm:\n    key: ${LLM_API_KEY}\n' >>"$repo/api/src/main/resources/application.yml"
 printf 'LLM_API_KEY=\n' >>"$repo/.env.example"
 printf '      PUSH: ${PUSH_KEY}\n' >>"$repo/compose.yaml"
+mkdir -p "$repo/deploy"
+printf 'services:\n  proxy:\n    environment:\n      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS 필요}\n' >"$repo/deploy/compose.yaml"
 git -C "$repo" add -A
 run "$repo"
 [ "$code" = 1 ] || fail "환경변수 누락: code=$code"
 expect_contains "$out" "LLM_API_KEY" "deployment.md 에 없는 변수"
 expect_contains "$out" "docs/deployment.md" "누락 위치(문서 표)"
 expect_contains "$out" "PUSH_KEY" "compose.yaml 에서 쓰는 변수"
+expect_contains "$out" "deploy/compose.yaml" "서버 compose 누락 위치"
+expect_contains "$out" "SITE_ADDRESS" "deploy/compose.yaml 에서 쓰는 변수"
 expect_contains "$out" ".env.example" "누락 위치(.env.example)"
 expect_missing "$out" "DB_PASSWORD" "한 칸에 여러 이름을 적은 변수는 통과"
 

@@ -12,7 +12,8 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 | 기능 브랜치 푸시 | 영향받는 모듈의 테스트 | 없음 |
 | 수동 실행 | 전체 | 없음 |
 
-- 브랜치 보호의 필수 검사는 CI 워크플로의 `ci-result`와 Convention 워크플로의 `convention`이다. `ci-result`는 CI의 검사 잡(`test`, `docs`) 결과를 모은 잡이다. 검사 잡을 추가하면 이 잡의 `needs`에 더한다.
+- 브랜치 보호의 필수 검사는 CI 워크플로의 `ci-result`와 Convention 워크플로의 `convention`이다. `ci-result`는 CI의 검사 잡(`test`, `docs`) 결과를 모은 잡이다. 검사 잡을 추가하면 이 잡과 `image` 잡의 `needs`에 더한다.
+- 이미지는 검사 잡이 모두 통과해야 올린다. CI가 실패한 커밋은 이미지도 개발 서버 반영도 나가지 않는다.
 - `ci-result`라는 이름은 `main` 대상 PR 실행(전체 테스트)에만 붙는다. 브랜치 푸시 실행은 `ci-result (push)`로 남아 필수 검사가 아니다. 같은 커밋에 두 실행이 같은 이름을 남기면 GitHub이 어느 결과로 머지를 허락할지 문서에 정해져 있지 않기 때문이다.
 - `docs` 잡은 이벤트와 바뀐 파일에 관계없이 항상 돈다. 문서 검사(`scripts/check-docs.sh`)와 Gradle 밖의 스크립트 테스트(`scripts/test-check-docs.sh`, `scripts/claude/test-next-story.sh`, `scripts/ci/test-cleanup-images.sh`)다. PR 본문 검사는 본문을 고칠 때도 다시 돌아야 해서 Convention 워크플로에 있다.
 - `develop` 이미지를 올리면 `deploy-dev` 잡이 개발 서버에 반영하고 상태 확인(`/actuator/health`)이 UP인지 본다. 접속 정보와 서버에서 실행하는 명령은 [deployment.md](deployment.md) 7절에 있다.
@@ -105,4 +106,4 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 
 ## 5. 검사를 추가할 자리
 
-새 검사(예: SDD 스펙과 코드가 맞는지)는 `ci.yml`에 잡으로 추가하고 `ci-result`의 `needs`에 더한다. 브랜치 보호 설정은 바꾸지 않아도 된다.
+새 검사(예: SDD 스펙과 코드가 맞는지)는 `ci.yml`에 잡으로 추가하고 `ci-result`와 `image`의 `needs`에 더한다. 브랜치 보호 설정은 바꾸지 않아도 된다.

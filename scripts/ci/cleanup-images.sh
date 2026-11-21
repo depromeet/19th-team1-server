@@ -8,6 +8,7 @@
 #   - 지금 브랜치 태그(main, develop)가 붙은 버전
 #   - 두 브랜치 중 한쪽에라도 남는 버전은 지우지 않는다.
 # 남길 버전이 하나도 없는데 버전이 있으면 아무것도 지우지 않고 실패한다.
+# 지우기 직전에 버전을 다시 읽어, 목록을 읽은 뒤 태그가 바뀐 버전(다른 잡이 태그를 옮김)은 지우지 않는다.
 #
 # 환경변수
 #   DRY_RUN        true 면 지울 목록만 출력한다. 기본 true
@@ -66,7 +67,17 @@ mode=$([[ "$DRY_RUN" == "true" ]] && echo "지울 목록만 출력 (DRY_RUN)" ||
 
 [[ "$DRY_RUN" == "true" ]] && exit 0
 
+# 목록을 읽은 뒤 다른 브랜치의 잡이 이 버전에 태그를 옮겼을 수 있다. 지우기 직전에 다시 읽어 태그가 달라졌으면 건너뛴다.
 for id in $(jq -r '.[].id' <<<"$to_delete"); do
+  listed=$(jq -c --argjson id "$id" '.[] | select(.id == $id) | .tags | sort' <<<"$to_delete")
+  if ! now=$(gh api "$api/$id" | jq -c '.metadata.container.tags | sort'); then
+    echo "건너뜀: $id (다시 읽지 못함. 이미 지워졌을 수 있다)" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+    continue
+  fi
+  if [[ "$now" != "$listed" ]]; then
+    echo "건너뜀: $id (목록을 읽은 뒤 태그가 바뀜: $now)" | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+    continue
+  fi
   gh api --method DELETE "$api/$id" > /dev/null
   echo "지움: $id"
 done

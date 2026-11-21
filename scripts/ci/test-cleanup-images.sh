@@ -80,20 +80,34 @@ if VERSIONS_JSON="$work/none.json" DRY_RUN=true "$script" >/dev/null 2>&1; then
   fail "남길 것이 없으면 실패해야 함"
 fi
 
-# 7. DRY_RUN=false 면 지울 버전마다 DELETE 를 부른다. DRY_RUN 이 기본(true)이면 부르지 않는다.
+# 가짜 gh. 호출을 기록하고, 버전 하나를 읽으면 CURRENT_JSON(지우기 직전 GHCR 상태)에서 그 버전을 돌려준다.
 mkdir -p "$work/bin"
 cat >"$work/bin/gh" <<SH
 #!/usr/bin/env bash
 echo "\$*" >>"$work/gh-calls.txt"
+if [[ "\$2" != "--method" ]]; then
+  jq -e --argjson id "\${2##*/}" '.[] | select(.id == \$id) | {id, metadata: {container: {tags}}}' "\$CURRENT_JSON"
+fi
 SH
 chmod +x "$work/bin/gh"
-PATH="$work/bin:$PATH" VERSIONS_JSON="$work/seven.json" DRY_RUN=false "$script" >/dev/null
-calls=$(sort "$work/gh-calls.txt" | tr '\n' ';')
-[[ "$calls" == "api --method DELETE orgs/depromeet/packages/container/19th-team1-server/versions/1;api --method DELETE orgs/depromeet/packages/container/19th-team1-server/versions/2;" ]] \
-  || fail "DELETE 호출이 틀림: $calls"
+deletes() { grep -- '--method DELETE' "$work/gh-calls.txt" | sed 's|.*/||' | sort -n | tr '\n' ' ' | sed 's/ $//'; }
+
+# 7. DRY_RUN=false 면 지울 버전마다 DELETE 를 부른다. DRY_RUN 이 기본(true)이면 gh 를 부르지 않는다.
 : >"$work/gh-calls.txt"
-PATH="$work/bin:$PATH" VERSIONS_JSON="$work/seven.json" "$script" >/dev/null
+PATH="$work/bin:$PATH" CURRENT_JSON="$work/seven.json" VERSIONS_JSON="$work/seven.json" DRY_RUN=false "$script" >/dev/null
+grep -qx -- 'api --method DELETE orgs/depromeet/packages/container/19th-team1-server/versions/1' "$work/gh-calls.txt" \
+  || fail "DELETE 경로가 틀림: $(tr '\n' ';' <"$work/gh-calls.txt")"
+[[ "$(deletes)" == "1 2" ]] || fail "DELETE 대상이 '1 2' 여야 하는데 '$(deletes)'"
+: >"$work/gh-calls.txt"
+PATH="$work/bin:$PATH" CURRENT_JSON="$work/seven.json" VERSIONS_JSON="$work/seven.json" "$script" >/dev/null
 [[ ! -s "$work/gh-calls.txt" ]] || fail "기본값(DRY_RUN)인데 gh 를 부름"
+
+# 8. 목록을 읽은 뒤 다른 잡이 태그를 옮긴 버전(2)과 이미 사라진 버전(1)은 지우지 않는다.
+jq '(.[] | select(.id == 2) | .tags) += ["develop", "develop-20261121-000000-bbbbbbb"] | map(select(.id != 1))' \
+  "$work/seven.json" >"$work/seven-retagged.json"
+: >"$work/gh-calls.txt"
+PATH="$work/bin:$PATH" CURRENT_JSON="$work/seven-retagged.json" VERSIONS_JSON="$work/seven.json" DRY_RUN=false "$script" >/dev/null 2>&1
+[[ -z "$(deletes)" ]] || fail "태그가 바뀌었거나 사라진 버전을 지움: '$(deletes)'"
 
 if ((failures > 0)); then
   echo "$failures 개 실패" >&2

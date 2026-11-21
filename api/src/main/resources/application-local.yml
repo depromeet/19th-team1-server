@@ -8,3 +8,10 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+
+# 로컬 작업 큐는 docker compose 의 ElasticMQ 다(compose.yaml, docker/elasticmq.conf).
+job:
+  queue:
+    url: ${SQS_QUEUE_URL:http://localhost:9324/000000000000/team1-jobs}
+    region: ${SQS_REGION:ap-southeast-2}
+    endpoint: ${SQS_ENDPOINT:http://localhost:9324}

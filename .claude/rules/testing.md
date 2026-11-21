@@ -16,6 +16,7 @@ paths:
 ## 대역
 
 - 서비스·워커 테스트는 Spring 없이 생성자로 조립하고, 바깥 의존은 직접 만든 가짜 구현으로 바꾼다. 목을 쓰지 않는다.
+- 예외: 워커·스케줄러를 설정 플래그로 켜고 끄는 테스트만 최소 Spring 컨텍스트(`AnnotationConfigApplicationContext`)를 띄운다. 켜고 끄기가 Spring 조건으로만 동작해서다.
 - 목(Mockito)은 컨트롤러 테스트에서 서비스를 대신할 때만 쓴다.
 - 쿼리는 실제 PostgreSQL(`PostgreSqlContainerConfiguration`)에서 실행해 검증한다. `EntityManager`나 Spring Data 리포지토리를 목으로 만들지 않는다. H2를 쓰지 않는다.
 - 외부 연동 클라이언트는 가짜 HTTP 서버로 테스트한다. 실제 LLM을 호출하지 않는다.

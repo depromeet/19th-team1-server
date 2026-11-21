@@ -16,6 +16,11 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
+    // 작업 큐(SQS). 버전은 AWS SDK BOM 이 정한다.
+    implementation(platform(libs.aws.sdk.bom))
+    implementation("software.amazon.awssdk:sqs")
+    implementation("software.amazon.awssdk:apache5-client")
+
     testFixturesImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
     testFixturesImplementation("org.springframework.boot:spring-boot-test")
     testFixturesImplementation("org.springframework:spring-jdbc")

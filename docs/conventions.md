@@ -147,7 +147,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 | Claude Code가 커밋할 때: 커밋 직전 훅(`.claude/settings.json`) | 문서 검사(`scripts/check-docs.sh`). 실패하면 커밋을 막는다 | 세션을 시작한 폴더만 검사한다. 다른 워크트리에서 한 커밋은 검사하지 않는다 |
 | 푸시할 때: `pre-push` 훅 | 문서 검사(`scripts/check-docs.sh`): 문서 안 상대 링크, roadmap 이슈 번호, 지운 표기, 코드에서 쓰는 환경변수가 `docs/deployment.md` 표와 `.env.example`에 있는지 | `--no-verify`로 건너뛸 수 있다 |
 | PR을 올리거나 수정할 때: `Convention` 워크플로 | PR 제목, 브랜치 이름, PR에 든 커밋 메시지, PR 본문(`Closes`·`Refs`, 닫는 이슈의 스토리 파일)을 검사한다 | 통과해야 머지할 수 있다 |
-| 기능 브랜치·`develop`에 푸시할 때: `CI` 워크플로 | 바뀐 모듈과 그 모듈에 의존하는 모듈의 테스트, 구조 테스트, 포맷 검사 ([ci.md](ci.md)), 문서 검사 | 머지를 막지 않는다. `develop`은 통과해야 이미지를 올린다 |
+| 기능 브랜치·`develop`에 푸시할 때: `CI` 워크플로 | 바뀐 모듈과 그 모듈에 의존하는 모듈의 테스트, 구조 테스트, 포맷 검사 ([ci.md](ci.md)), 문서 검사 | 머지를 막지 않는다. `develop`은 통과해야 이미지를 올리고 개발 서버에 반영한다 |
 | `main`에 푸시될 때(머지 후): `CI` 워크플로 | `./gradlew ktlintCheck build` (포맷 검사, 전체 테스트), 문서 검사 | 통과해야 이미지를 올린다 |
 | `main` 대상 PR을 올리거나 수정할 때: `CI` 워크플로 | `./gradlew ktlintCheck build` (포맷 검사, 전체 테스트), 문서 검사. 결과는 `ci-result` 검사 하나로 모인다 | 통과해야 머지할 수 있다 |
 | 머지할 때: 브랜치 규칙 | `main`은 PR과 두 검사 통과가 있어야 하고 squash 머지만 허용한다. 직접 푸시, 강제 푸시, 삭제는 막혀 있다 | 불가 |

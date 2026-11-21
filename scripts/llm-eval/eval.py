@@ -7,7 +7,9 @@ docs/llm-evaluation.md에 있다.
 
     python3 eval.py keys  [--models ID,...]   필요한 키 환경변수가 있는지 확인
     python3 eval.py fetch                     링크마다 분석 입력을 만들어 .cache/에 저장
-    python3 eval.py run   [--models ID,...]   모델 호출, out/<모델>.jsonl에 저장
+    python3 eval.py run   [--models ID,...] [--fresh]
+                                              모델 호출, out/<모델>.jsonl에 저장. 기본은 이전 결과에서
+                                              API 오류가 난 링크만 다시 부른다
     python3 eval.py score                     out/의 결과를 채점해 표 출력, 사람이 볼 review CSV 저장
 
 API 키는 환경변수로만 읽고, 값은 출력하지 않는다.
@@ -281,7 +283,10 @@ def system_prompt(config: dict) -> str:
         detail_lines.append(f"- {c['name']}: " + " / ".join(parts))
     return (
         "사용자가 나중에 다시 쓰려고 저장한 링크를 정리한다. 주어진 정보만 근거로 아래를 한국어로 만든다.\n"
-        f"category: 다음 중 하나만 고른다. 형식(영상·이미지)이 아니라 주제와 활용 목적으로 고른다.\n{cats}\n"
+        "category: 다음 중 하나만 고른다. 형식(영상·이미지)이나 주제가 아니라, 저장한 사람이 나중에 이 링크로 할 일"
+        "(가 보기, 사기, 생활에서 따라 하기, 일·공부에 쓰기, 참고하기, 혜택 쓰기)로 고른다. "
+        "할 일 없이 읽거나 보고 끝나는 것만 콘텐츠·아티클로 고른다. 제목보다 실제 내용을 따른다.\n"
+        f"{cats}\n"
         "alt_category: 두 카테고리에 걸치거나 분류가 애매하면 두 번째 후보. 애매하지 않으면 빈 문자열.\n"
         "summary: 무엇에 관한 링크인지 두 문장 이내. 정보가 부족하면 아는 만큼만 쓰고 지어내지 않는다.\n"
         "keywords: 나중에 검색할 때 쓸 핵심 주제어 3~5개. 고유명사(가게, 장소, 제품, 사람 이름)를 우선한다.\n"
@@ -559,6 +564,48 @@ def run_one(model: dict, item: dict, config: dict, call=call_model) -> dict:
     return row
 
 
+# 요청 한도(429)와 제공자 쪽 일시 과부하(503, Anthropic 529)는 기다리면 풀린다.
+RETRYABLE_MARKERS = ("429", "RESOURCE_EXHAUSTED", "rate_limit", "RateLimit",
+                     "503", "UNAVAILABLE", "529", "overloaded")
+
+
+def is_retryable(error: str) -> bool:
+    return any(m in error for m in RETRYABLE_MARKERS)
+
+
+def retry_delay_s(error: str, default: float = 60.0, cap: float = 120.0) -> float:
+    """제공자가 알려 준 대기 시간(Gemini의 retryDelay 등)을 쓰고, 없으면 기본값을 쓴다."""
+    m = re.search(r"retryDelay'?\"?:\s*'?\"?(\d+(?:\.\d+)?)s", error)
+    return min(float(m.group(1)) + 1, cap) if m else default
+
+
+def run_with_retry(model: dict, item: dict, config: dict, call=call_model, sleep=time.sleep,
+                   max_retries: int = 5) -> dict:
+    """요청 한도나 일시 과부하면 기다렸다가 다시 부른다. 다른 오류는 바로 돌려준다."""
+    row = run_one(model, item, config, call=call)
+    for _ in range(max_retries):
+        error = row.get("api_error", "")
+        if not is_retryable(error):
+            break
+        wait = retry_delay_s(error)
+        print(f"{model['id']} {item['id']} {error[:40]}…, {wait:.0f}초 뒤 다시 부른다")
+        sleep(wait)
+        row = run_one(model, item, config, call=call)
+    return row
+
+
+def write_rows(path: Path, rows: list[dict]) -> None:
+    path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+
+
+def load_done_rows(path: Path) -> dict[str, dict]:
+    """이전 결과에서 API 오류 없이 끝난 행(형식 오류 포함)만 링크 ID별로 돌려준다."""
+    if not path.exists():
+        return {}
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return {r["id"]: r for r in rows if not r.get("api_error")}
+
+
 # ---------- 명령 ----------
 
 def cmd_keys(args, config) -> int:
@@ -598,11 +645,21 @@ def cmd_run(args, config) -> int:
     OUT_DIR.mkdir(exist_ok=True)
     for model in models:
         path = OUT_DIR / f"{model['id']}.jsonl"
-        with path.open("w", encoding="utf-8") as f:
-            for item in items:
-                row = run_one(model, item, config)
-                f.write(json.dumps(row, ensure_ascii=False) + "\n")
-                print(f"{model['id']} {item['id']} {row.get('api_error') or row.get('format_error') or 'ok'}")
+        done = {} if getattr(args, "fresh", False) else load_done_rows(path)
+        if done:
+            print(f"{model['id']}: 이전 결과 {len(done)}건은 다시 부르지 않는다 (--fresh로 전부 다시)")
+        rows = []
+        for item in items:
+            if item["id"] in done:
+                rows.append(done[item["id"]])
+                continue
+            row = run_with_retry(model, item, config)
+            rows.append(row)
+            print(f"{model['id']} {item['id']} {row.get('api_error') or row.get('format_error') or 'ok'}")
+            # 한 건마다 저장해, 중간에 멈춰도 이전 결과와 지금까지의 결과가 남게 한다.
+            rest = [done[i["id"]] for i in items[len(rows):] if i["id"] in done]
+            write_rows(path, rows + rest)
+        write_rows(path, rows)
     return 0
 
 
@@ -635,6 +692,8 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("keys", "run"):
         p = sub.add_parser(name)
         p.add_argument("--models", help="쉼표로 구분한 모델 ID. 없으면 config.json의 전체")
+        if name == "run":
+            p.add_argument("--fresh", action="store_true", help="이전 결과를 무시하고 전부 다시 부른다")
     sub.add_parser("fetch")
     sub.add_parser("score")
     args = parser.parse_args(argv)

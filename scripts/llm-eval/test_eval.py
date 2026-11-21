@@ -4,7 +4,10 @@
 """
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import eval as ev
 
@@ -137,7 +140,9 @@ class PromptTest(unittest.TestCase):
     def test_prompt_has_category_descriptions_and_detail_rules(self):
         text = ev.system_prompt(CONFIG)
         self.assertIn("업무·학습: 방법 습득, 업무 수행, 실습·참고용 실용 자료", text)
-        self.assertIn("콘텐츠·아티클: 정보 습득, 시사·트렌드, 견해·이야기 중심 콘텐츠", text)
+        self.assertIn("콘텐츠·아티클: 읽거나 보고 끝나는 정보, 시사·트렌드, 견해·이야기 중심 콘텐츠", text)
+        self.assertIn("나중에 이 링크로 할 일", text)  # 분류 기준은 주제가 아니라 저장 목적
+        self.assertIn("제목보다 실제 내용", text)
         self.assertIn("장소 유형(place_type): 식당, 카페, 관광지, 기타 중 하나", text)
         self.assertIn("근거가 없으면 빈 문자열", text)
         self.assertIn("alt_category", text)
@@ -179,6 +184,92 @@ class OutputTest(unittest.TestCase):
         row = ev.run_one(model, item, CONFIG, call=lambda *a: (ok, 100, 20))
         self.assertEqual((row["output"]["details"]["brand"], row["input_tokens"]), ("무신사", 100))
 
+
+class RetryTest(unittest.TestCase):
+    MODEL = {"id": "m"}
+    ITEM = {"id": "L01", "url": "u", "title": "", "author": "", "description": "", "body": "", "memo": "m"}
+
+    def test_retry_delay_uses_provider_hint(self):
+        gemini = "ClientError: 429 RESOURCE_EXHAUSTED. {... 'retryDelay': '42s'}"
+        self.assertEqual(ev.retry_delay_s(gemini), 43)
+        self.assertEqual(ev.retry_delay_s("429 Too Many Requests"), 60)
+        self.assertEqual(ev.retry_delay_s("'retryDelay': '900s'"), 120)
+
+    def test_rate_limit_is_retried_after_waiting(self):
+        ok = json.dumps(answer())
+        calls, waits = [], []
+
+        def flaky(*a):
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("429 RESOURCE_EXHAUSTED 'retryDelay': '5s'")
+            return ok, 10, 2
+
+        row = ev.run_with_retry(self.MODEL, self.ITEM, CONFIG, call=flaky, sleep=waits.append)
+        self.assertEqual((len(calls), waits, "api_error" in row), (2, [6], False))
+
+    def test_other_errors_and_exhausted_retries_are_recorded(self):
+        waits = []
+
+        def busy_then_ok(*a):
+            if not waits:
+                raise RuntimeError("ServerError: 503 UNAVAILABLE. high demand")
+            return json.dumps(answer()), 10, 2
+
+        row = ev.run_with_retry(self.MODEL, self.ITEM, CONFIG, call=busy_then_ok, sleep=waits.append)
+        self.assertEqual((waits, "api_error" in row), ([60], False))
+        waits.clear()
+
+        def boom(*a):
+            raise RuntimeError("401 invalid key")
+
+        row = ev.run_with_retry(self.MODEL, self.ITEM, CONFIG, call=boom, sleep=waits.append)
+        self.assertEqual((waits, "401" in row["api_error"]), ([], True))
+
+        def limited(*a):
+            raise RuntimeError("429")
+
+        row = ev.run_with_retry(self.MODEL, self.ITEM, CONFIG, call=limited, sleep=waits.append, max_retries=2)
+        self.assertEqual((len(waits), "429" in row["api_error"]), (2, True))
+
+    def test_load_done_rows_keeps_only_rows_without_api_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "m.jsonl"
+            self.assertEqual(ev.load_done_rows(path), {})
+            ev.write_rows(path, [{"id": "L01", "output": {}}, {"id": "L02", "api_error": "429"},
+                                 {"id": "L03", "format_error": "JSON 아님"}])
+            self.assertEqual(sorted(ev.load_done_rows(path)), ["L01", "L03"])
+
+
+    def test_run_calls_only_links_without_result(self):
+        config = {**CONFIG, "models": [{"id": "m", "key_env": "LLM_EVAL_TEST_KEY"}]}
+        links = [link("instagram", memo="a"), ev.Link(id="L02", platform="instagram", url="u", memo="b", label_category="", label_keywords=[])]
+
+        class Args:
+            models = None
+            fresh = False
+
+        with tempfile.TemporaryDirectory() as d:
+            cache, out = Path(d) / "cache", Path(d) / "out"
+            cache.mkdir()
+            out.mkdir()
+            for l in links:
+                (cache / f"{l.id}.json").write_text(json.dumps({**self.ITEM, "id": l.id}), encoding="utf-8")
+            ev.write_rows(out / "m.jsonl", [{"id": "L01", "output": {}}, {"id": "L02", "api_error": "429"}])
+            called = []
+
+            def fake(model, item, config):
+                called.append(item["id"])
+                return {"id": item["id"], "output": {}}
+
+            with mock.patch.multiple(ev, CACHE_DIR=cache, OUT_DIR=out, load_links=lambda: links,
+                                     run_with_retry=fake), mock.patch.dict("os.environ", {"LLM_EVAL_TEST_KEY": "x"}):
+                self.assertEqual(ev.cmd_run(Args, config), 0)
+                rows = [json.loads(x) for x in (out / "m.jsonl").read_text(encoding="utf-8").splitlines()]
+                self.assertEqual((called, [r["id"] for r in rows], "api_error" in rows[1]), (["L02"], ["L01", "L02"], False))
+                Args.fresh = True
+                ev.cmd_run(Args, config)
+                self.assertEqual(called, ["L02", "L01", "L02"])
 
 class LinksTest(unittest.TestCase):
     def test_label_detail_columns_are_read(self):

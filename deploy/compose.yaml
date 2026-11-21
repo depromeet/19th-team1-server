@@ -1,4 +1,4 @@
-# 개발·운영 서버용. 두 서버가 이 파일을 그대로 쓰고, 차이는 같은 폴더의 .env 로만 준다(docs/deployment.md 7절).
+# 개발 서버용. 서버 설정값은 같은 폴더의 .env 로 준다(docs/deployment.md 7절).
 # 서버에서는 /srv/team1 에 이 파일, Caddyfile, .env 를 두고 그 폴더에서 실행한다.
 #
 # 배포는 `docker compose pull app && docker compose up -d` 만 쓴다. `docker compose down` 은 쓰지 않는다.
@@ -12,7 +12,7 @@ x-logging: &logging
 
 services:
   app:
-    image: ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:?.env 에 APP_IMAGE_TAG 를 설정하세요 (개발 develop, 운영 main)}
+    image: ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:?.env 에 APP_IMAGE_TAG 를 설정하세요 (개발 서버는 develop)}
     env_file: .env
     environment:
       # DB 는 같은 Compose 의 postgres 서비스다. .env 의 DB_URL 은 쓰지 않는다.

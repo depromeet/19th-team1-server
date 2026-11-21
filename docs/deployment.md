@@ -1,6 +1,6 @@
 # 빌드·실행·배포 전제
 
-애플리케이션의 빌드·실행 전제와 개발·운영 서버 구성을 정리한다. 서버 구성은 7절에 있다.
+애플리케이션의 빌드·실행 전제와 개발 서버 구성을 정리한다. 서버 구성은 7절에 있다. 운영 환경 구성은 정하지 않았다.
 
 ## 1. 요구 사항
 
@@ -32,7 +32,7 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 - 개발 서버용과 운영 서버용 이미지는 같은 패키지에 태그로 나뉜다. 컨테이너 안에서 `java org.springframework.boot.loader.launch.JarLauncher`로 실행하고, `app` 사용자(root 아님)로 돈다. 포트는 8080이다.
 - 직접 만들 때: `./gradlew :api:bootJar && docker build -t team1-server .`
 - GHCR 패키지는 공개다. 서버에서 로그인 없이 받는다.
-- 서버 Compose 파일은 레포의 [deploy/compose.yaml](../deploy/compose.yaml)이다(7절). 이 이미지를 쓰는 서비스 이름은 `app`이고, 태그는 서버 `.env`의 `APP_IMAGE_TAG`로 준다(개발 `develop`, 운영 `main`). 아래 명령으로 새 이미지를 받아 그 서비스만 다시 띄운다.
+- 개발 서버 Compose 파일은 레포의 [deploy/compose.yaml](../deploy/compose.yaml)이다(7절). 이 이미지를 쓰는 서비스 이름은 `app`이고, 태그는 서버 `.env`의 `APP_IMAGE_TAG`로 준다(개발 서버는 `develop`). 아래 명령으로 새 이미지를 받아 그 서비스만 다시 띄운다.
 
   ```bash
   docker compose pull app && docker compose up -d --no-deps app
@@ -46,7 +46,7 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | --- | --- | --- |
 | `local` | 각자 PC | 레포 루트의 `.env` |
 | `dev` | 개발 서버 | 서버의 `/srv/team1/.env` (7절) |
-| `prod` | 운영 서버 | 서버의 `/srv/team1/.env` (7절) |
+| `prod` | 운영 환경 | 미정 (운영 환경 구성을 정할 때 정한다) |
 
 - `SPRING_PROFILES_ACTIVE`를 주지 않으면 `local`로 뜬다. 서버에서는 반드시 지정한다.
 - 프로필별로 다른 설정이 생기면 `api/src/main/resources/application-{프로필}.yml`을 추가한다.
@@ -55,13 +55,13 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 
 값은 코드·설정 파일·문서에 넣지 않는다. 로컬은 레포 루트의 `.env`(커밋 금지), 서버는 `/srv/team1/.env`(7절)에 둔다. 서버 값은 서버에서 직접 적고 서버 밖에 남기지 않는다. 이름은 `.env.example`에도 같은 목록을 둔다.
 
-"필요한 곳"은 그 값을 읽는 쪽이다. `앱`은 애플리케이션, `Compose`는 Compose 파일(로컬 `compose.yaml`, 서버 `deploy/compose.yaml`)이다. `서버`는 개발·운영 서버 `.env`에 반드시 넣고, `로컬`은 로컬에서만 쓴다. `(선택)`은 기본값이 있어 비워도 된다.
+"필요한 곳"은 그 값을 읽는 쪽이다. `앱`은 애플리케이션, `Compose`는 Compose 파일(로컬 `compose.yaml`, 서버 `deploy/compose.yaml`)이다. `서버`는 개발 서버 `.env`에 반드시 넣고, `로컬`은 로컬에서만 쓴다. `(선택)`은 기본값이 있어 비워도 된다.
 
 | 이름 | 필요한 곳 | 용도 |
 | --- | --- | --- |
 | `SPRING_PROFILES_ACTIVE` | 앱, 서버 | `dev` 또는 `prod`. 비우면 `local` |
-| `APP_IMAGE_TAG` | 서버 Compose | `app` 서비스의 이미지 태그. 개발 `develop`, 운영 `main`. 되돌릴 때는 이력 태그(3절) |
-| `SITE_ADDRESS` | 서버 Compose | Caddy가 받는 호스트 이름. 이 이름으로 HTTPS 인증서를 받는다. 개발 `15-135-160-110.sslip.io`, 운영 `api.<도메인>`(도메인 미정) |
+| `APP_IMAGE_TAG` | 서버 Compose | `app` 서비스의 이미지 태그. 개발 서버는 `develop`. 되돌릴 때는 이력 태그(3절) |
+| `SITE_ADDRESS` | 서버 Compose | Caddy가 받는 호스트 이름. 이 이름으로 HTTPS 인증서를 받는다. 개발 서버는 고정 IP의 임시 sslip.io 주소(실제 값은 팀 디스코드에 공유) |
 | `DB_URL` | 앱, 로컬 | JDBC URL (예: `jdbc:postgresql://localhost:5432/DB이름`). 서버는 Compose가 `DB_NAME`으로 만들어 넘기므로 `.env`에 두지 않는다 |
 | `DB_USERNAME`, `DB_PASSWORD` | 앱, Compose | DB 계정. PostgreSQL 컨테이너가 처음 뜰 때 이 계정을 만든다 |
 | `DB_NAME` | Compose | PostgreSQL 컨테이너가 처음 뜰 때 만들 DB. 서버 Compose는 `DB_URL`도 이 이름으로 만든다 |
@@ -69,10 +69,10 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | `KAKAO_REDIRECT_URI` | 앱, 서버 | 카카오 로그인 리다이렉트 URI. 카카오 개발자 콘솔에 등록한 값과 같아야 한다 |
 | `JWT_SECRET` | 앱, 서버 | 액세스 토큰 서명 키(HS256). Base64 로 32바이트 이상. 비어 있으면 `dev`·`prod`는 뜨지 않고, `local`은 임시 키로 뜬다(재시작하면 토큰 무효). 바꾸면 발급한 액세스 토큰이 모두 무효가 된다 |
 | `AUTH_REFRESH_TOKEN_REUSE_GRACE` | 앱(선택) | 재발급으로 폐기된 리프레시 토큰이 이 시간 안에 다시 오면 동시 재발급으로 보고 새 토큰 쌍을 준다. 지나서 오면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운다. 기본 `30s` |
-| `SQS_QUEUE_URL` | 앱, 서버 | 작업 큐 URL. 개발 `team1-dev-jobs`, 운영 `team1-prod-jobs`의 URL(6절). 로컬 기본값은 ElasticMQ의 `team1-jobs` |
-| `SQS_REGION` | 앱, 서버 | 작업 큐 리전. 개발·운영 `ap-southeast-2`. 로컬 기본값도 `ap-southeast-2` |
+| `SQS_QUEUE_URL` | 앱, 서버 | 작업 큐 URL. 개발 서버는 `team1-dev-jobs`의 URL(6절). 로컬 기본값은 ElasticMQ의 `team1-jobs` |
+| `SQS_REGION` | 앱, 서버 | 작업 큐 리전. 개발 서버는 `ap-southeast-2`. 로컬 기본값도 `ap-southeast-2` |
 | `SQS_ENDPOINT` | 앱, 로컬 | SQS 호환 서버 주소. 있으면 그 주소에 자격 증명 없이 붙는다. 서버에서는 비운다 |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | 앱, 서버 | SQS 자격 증명. 개발 `team1-dev-app`, 운영 `team1-prod-app` IAM 사용자의 액세스 키(6절). Lightsail은 IAM 역할을 붙일 수 없어 환경변수로 준다. AWS SDK가 기본 순서(환경변수, 인스턴스 역할 등)로 찾는다 |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | 앱, 서버 | SQS 자격 증명. 개발 서버는 `team1-dev-app` IAM 사용자의 액세스 키(6절). Lightsail은 IAM 역할을 붙일 수 없어 환경변수로 준다. AWS SDK가 기본 순서(환경변수, 인스턴스 역할 등)로 찾는다 |
 | `JOB_MAX_ATTEMPTS` | 앱(선택) | DB 시도 횟수 상한. 기본 3 |
 | `JOB_VISIBILITY_TIMEOUT` | 앱(선택) | 받은 메시지의 가시성 제한 시간이자 실행 중인 작업을 멈춘 것으로 보는 시간. ISO-8601(`PT5M`). 기본 5분 |
 | `JOB_REPUBLISH_AFTER` | 앱(선택) | 이보다 오래 PENDING·QUEUED인 작업을 다시 발행한다. ISO-8601. 기본 10분 |
@@ -88,7 +88,7 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 
 | 항목 | 값 | 이유 |
 | --- | --- | --- |
-| 큐 | 표준 큐 1개와 DLQ 1개, `dev`·`prod` 따로 | 순서가 필요 없다 |
+| 큐 | 표준 큐 1개와 DLQ 1개, 환경마다 따로 | 순서가 필요 없다 |
 | 메시지 내용 | 작업 ID만 | 사용자 데이터를 큐에 남기지 않는다 |
 | 받기 | 롱 폴링 20초, 비어 있는 처리 칸 수만큼(최대 10개). 큐의 수신 대기 시간도 20초 | 동시 처리 수 상한을 지키고 빈 응답을 줄인다 |
 | 가시성 제한 시간 | 링크 수집 타임아웃 + LLM 타임아웃 + 여유. 앱이 받을 때 지정하고(기본 5분), 큐 기본값도 5분 | 재시도와 중단된 작업 복구를 SQS 재전송으로 한다. 처리 중에 다시 보내지 않게 처리 시간보다 길어야 한다 |
@@ -98,15 +98,15 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | 경보 | DLQ에 메시지가 생기면 CloudWatch 경보. 아직 만들지 않았다 | 원래 오지 않는 경로다 |
 | 권한 | 앱 전용 IAM 사용자에 작업 큐의 발행·받기·삭제(`sqs:SendMessage`, `sqs:ReceiveMessage`, `sqs:DeleteMessage`)만 | 앱이 쓰는 SQS API는 이 셋뿐이다. DLQ는 사람이 콘솔에서 본다 |
 
-환경마다 만든 것은 아래와 같다. 리전은 모두 `ap-southeast-2`다. 운영은 운영 서버를 만들 때 같은 설정으로 만든다.
+개발 환경에 만든 것은 아래와 같다. 리전은 `ap-southeast-2`다. 운영 환경 구성은 정하지 않았다(7절).
 
-| 항목 | 개발 | 운영 |
-| --- | --- | --- |
-| 작업 큐 | `team1-dev-jobs` | `team1-prod-jobs` (예정) |
-| DLQ | `team1-dev-jobs-dlq` | `team1-prod-jobs-dlq` (예정) |
-| 앱 IAM 사용자 | `team1-dev-app` (콘솔 로그인 없음) | `team1-prod-app` (예정) |
-| 권한 정책 | 인라인 정책 `team1-dev-jobs-queue` | 같은 규칙 (예정) |
-| DLQ 경보 | 없음 | 운영을 만들 때 함께 만든다 |
+| 항목 | 개발 |
+| --- | --- |
+| 작업 큐 | `team1-dev-jobs` |
+| DLQ | `team1-dev-jobs-dlq` |
+| 앱 IAM 사용자 | `team1-dev-app` (콘솔 로그인 없음) |
+| 권한 정책 | 인라인 정책 `team1-dev-jobs-queue` |
+| DLQ 경보 | 없음 |
 
 - 설정의 환경변수 이름은 5절 표에 있다. 가시성 제한 시간, DB 재시도 상한, 재발행 대기 시간은 앱 기본값을 쓴다. 바꾸려면 서버 `.env`에 적는다.
 - 가시성 제한 시간은 앱이 메시지를 받을 때 직접 지정한다(`JOB_VISIBILITY_TIMEOUT`). 실행 중인 작업을 멈춘 것으로 보는 시간과 같은 값이라 둘이 어긋나지 않는다. 큐에 둔 기본값은 앱이 지정하지 않은 수신에만 쓰인다.
@@ -117,20 +117,19 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 
 ## 7. 서버 구성
 
-개발 서버와 운영 서버는 같은 규칙으로 만든다. 운영 서버는 프리런칭 1주 전에 만든다. AWS 리소스는 모두 시드니(`ap-southeast-2`)에 있다. 지금 계정(무료 플랜)은 이 리전에만 리소스를 만들 수 있다.
+개발 서버 구성이다. 운영 환경 구성은 정하지 않았다. 개발 환경에서 테스트하며 정한다. AWS 리소스는 모두 시드니(`ap-southeast-2`)에 있다. 지금 계정(무료 플랜)은 이 리전에만 리소스를 만들 수 있다.
 
-| 항목 | 개발 | 운영 |
-| --- | --- | --- |
-| 서버 | Lightsail `team1-dev`, Ubuntu 24.04, 2GB 메모리·2 vCPU·60GB | Lightsail `team1-prod` (예정, 같은 사양) |
-| 고정 IP | `team1-dev-ip` (15.135.160.110) | `team1-prod-ip` (예정) |
-| 방화벽 | 22, 80, 443 (IPv4·IPv6) | 같음 |
-| 주소 (`SITE_ADDRESS`) | `15-135-160-110.sslip.io`. 도메인을 정하기 전 임시 주소다 | `api.<도메인>` (도메인 미정) |
-| 이미지 태그 (`APP_IMAGE_TAG`) | `develop`. `develop` 이미지가 생기기 전에는 `main` | `main` |
-| 프로필 (`SPRING_PROFILES_ACTIVE`) | `dev` | `prod` |
-| 작업 큐·자격 증명 | 6절 | 6절 |
-| 예산 알림 | `team1-dev-monthly` 월 $13 (계정 전체, 크레딧 차감 전 금액) | 운영을 만들 때 금액을 조정한다 |
-| 서버 설정 | Docker CE + Compose 플러그인, swap 2GB(`/swapfile`), 사용자 `deploy`(docker 그룹), `/srv/team1`(`deploy` 소유), 비밀번호 로그인 꺼짐 | 같음 |
-| 배포 접속 | `deploy` 사용자로 SSH 키 접속. sudo 없이 `/srv/team1`에 쓰고 `docker compose`를 실행한다. CD(E1-3)도 이 사용자로 접속하고, 공개키 등록은 사람이 한다 | 같음 |
+| 항목 | 개발 |
+| --- | --- |
+| 서버 | Lightsail `team1-dev`, Ubuntu 24.04, 2GB 메모리·2 vCPU·60GB |
+| 고정 IP·주소 | Lightsail 고정 IP · 임시 sslip.io 주소 (실제 값은 팀 디스코드에 공유). 도메인을 정하기 전 임시 주소다 |
+| 방화벽 | 22, 80, 443 (IPv4·IPv6) |
+| 이미지 태그 (`APP_IMAGE_TAG`) | `develop`. `develop` 이미지가 생기기 전에는 `main` |
+| 프로필 (`SPRING_PROFILES_ACTIVE`) | `dev` |
+| 작업 큐·자격 증명 | 6절 |
+| 예산 알림 | `team1-dev-monthly` 월 $13 (계정 전체, 크레딧 차감 전 금액) |
+| 서버 설정 | Docker CE + Compose 플러그인, swap 2GB(`/swapfile`), 사용자 `deploy`(docker 그룹), `/srv/team1`(`deploy` 소유), 비밀번호 로그인 꺼짐 |
+| 배포 접속 | `deploy` 사용자로 SSH 키 접속. sudo 없이 `/srv/team1`에 쓰고 `docker compose`를 실행한다. CD(E1-3)도 이 사용자로 접속하고, 공개키 등록은 사람이 한다 |
 
 ### AWS 계정 접근
 
@@ -149,7 +148,7 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 └── postgres-data/   PostgreSQL 데이터 (바인드 마운트)
 ```
 
-- 개발·운영이 같은 `compose.yaml`과 `Caddyfile`을 쓰고, 차이는 `.env`로만 준다.
+- 서버마다 다른 값은 `.env`로만 준다.
 - `.env`에는 `DB_URL`을 두지 않는다. Compose가 `DB_NAME`으로 `jdbc:postgresql://postgres:5432/<DB_NAME>`을 만들어 앱에 넘긴다.
 - Caddy가 받은 인증서는 이름 있는 볼륨(`caddy-data`)에 남는다.
 

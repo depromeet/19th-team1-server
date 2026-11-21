@@ -61,6 +61,8 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | `DB_URL` | 앱 | JDBC URL (예: `jdbc:postgresql://호스트:5432/DB이름`) |
 | `DB_USERNAME`, `DB_PASSWORD` | 앱, 로컬 PostgreSQL | DB 계정 |
 | `DB_NAME` | 로컬 PostgreSQL | 컨테이너가 처음 뜰 때 만들 DB |
+| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | 앱 | 카카오 로그인 앱의 REST API 키와 클라이언트 시크릿. 셋 중 하나라도 비어 있으면 `dev`·`prod`는 뜨지 않고, `local`은 경고를 남기고 떠서 로그인만 실패한다 |
+| `KAKAO_REDIRECT_URI` | 앱 | 카카오 로그인 리다이렉트 URI. 카카오 개발자 콘솔에 등록한 값과 같아야 한다 |
 
 기능이 추가되면 이 표에 함께 추가한다.
 

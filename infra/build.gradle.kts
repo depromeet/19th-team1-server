@@ -16,6 +16,13 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
+    // 외부 연동(카카오 등)의 HTTP 호출
+    implementation("org.springframework:spring-web")
+    implementation("tools.jackson.module:jackson-module-kotlin")
+
+    // 외부 연동 클라이언트 테스트용 가짜 HTTP 서버
+    testImplementation(libs.mockwebserver)
+
     testFixturesImplementation(platform(SpringBootPlugin.BOM_COORDINATES))
     testFixturesImplementation("org.springframework.boot:spring-boot-test")
     testFixturesImplementation("org.springframework:spring-jdbc")

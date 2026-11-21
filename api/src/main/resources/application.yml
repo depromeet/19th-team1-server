@@ -28,6 +28,18 @@ spring:
 # 여기에 ${...} 로 적지 않는다. 값이 없을 때 자리표시자 문자열이 그대로 들어가 비어 있는지 검사할 수 없다.
 # 비어 있으면 dev·prod 는 기동하지 않고, local 은 경고를 남기고 뜬 뒤 로그인 요청만 실패한다(KakaoConfiguration).
 
+# LLM(docs/deployment.md 5절). Gemini 키는 환경변수 GEMINI_API_KEY 로만 받는다. 여기에 ${...} 로 적지 않는다(카카오와 같은 이유).
+# 키가 비어 있으면 dev·prod 는 기동하지 않고, local 은 경고를 남기고 뜬 뒤 LLM 호출만 실패한다(GeminiConfiguration).
+gemini:
+  model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+  # LLM 응답 타임아웃. 링크 수집 타임아웃과 합쳐도 job.visibility-timeout 보다 짧게 둔다.
+  read-timeout: ${LLM_TIMEOUT:PT60S}
+
+llm:
+  # 하루(한국 시간 자정 기준) 토큰 상한. 입력 + 출력 토큰 합. 임시값이며 2주차 사용량을 보고 조정한다.
+  member-daily-token-limit: ${LLM_MEMBER_DAILY_TOKEN_LIMIT:1000000}
+  global-daily-token-limit: ${LLM_GLOBAL_DAILY_TOKEN_LIMIT:5000000}
+
 # 처리 작업과 작업 큐(docs/deployment.md 6절). 기본값은 운영 값을 정하기 전의 임시 값이다.
 job:
   queue:

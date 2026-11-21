@@ -38,7 +38,7 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
   docker compose pull app && docker compose up -d --no-deps app
   ```
 
-  서비스의 이미지를 개발 서버는 `ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:-develop}`, 운영 서버는 `…:${APP_IMAGE_TAG:-main}`처럼 두면, `APP_IMAGE_TAG`에 브랜치 이력 태그(`<브랜치>-<UTC 시각>-<커밋 7자리>`, 예: `main-20261120-153000-abc1234`)를 넣고 같은 명령을 실행해 이전 버전으로 되돌릴 수 있다. 태그 목록은 GHCR 패키지 화면에서 본다.
+  서비스의 이미지를 개발 서버는 `ghcr.io/depromeet/19th-team1-server:${APP_IMAGE_TAG:-develop}`, 운영 서버는 `…:${APP_IMAGE_TAG:-main}`처럼 두면, `APP_IMAGE_TAG`에 브랜치 이력 태그(`<브랜치>-<UTC 시각>-<커밋 7자리>`, 예: `main-20261120-153000-abc1234`)를 넣고 같은 명령을 실행해 이전 버전으로 되돌릴 수 있다. 브랜치별 최근 5개 이미지는 정리에서 지우지 않으므로 그 안에서는 언제든 되돌릴 수 있다([ci.md](ci.md) 4장 "보관"). 태그 목록은 GHCR 패키지 화면에서 본다.
 
 ## 4. 프로필
 

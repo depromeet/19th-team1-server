@@ -4,6 +4,7 @@ name: CI
 #   - main 대상 PR, main 푸시, 수동 실행: 전체 테스트
 #   - 그 밖의 브랜치 푸시(기능 브랜치, develop): 바뀐 모듈과 그 모듈에 의존하는 모듈의 테스트. 구조 테스트는 항상
 # 이미지: develop·main 에 푸시되고 테스트를 통과하면 GHCR 에 올린다. 지문(실행 jar, Dockerfile, .dockerignore 의 sha256)이 같은 이미지가 있으면 새로 만들지 않고 태그만 옮긴다.
+#   올린 뒤 브랜치별 최근 5개를 넘는 오래된 이미지를 정리한다(scripts/ci/cleanup-images.sh).
 on:
   pull_request:
     branches: [main]
@@ -87,6 +88,8 @@ jobs:
         run: scripts/test-check-docs.sh
       - name: 다음 스토리 고르기 테스트
         run: scripts/claude/test-next-story.sh
+      - name: 이미지 정리 스크립트 테스트
+        run: scripts/ci/test-cleanup-images.sh
 
   image:
     needs: test
@@ -168,6 +171,16 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             team1.fingerprint=${{ steps.fingerprint.outputs.value }}
+
+      # 브랜치(main, develop)별 최근 5개 이미지만 남긴다. DRY_RUN 이 true 면 지울 목록만 요약(Summary)에 출력한다.
+      - name: 오래된 이미지 정리
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: ${{ github.event.repository.name }}
+          KEEP: "5"
+          DRY_RUN: "true"
+        run: scripts/ci/cleanup-images.sh
 
   # CI 의 검사 잡(test, docs) 결과를 이 잡 하나로 모은다. 머지 뒤에 도는 image 잡은 넣지 않는다. 브랜치 보호는 이 잡과 Convention 워크플로의 convention 을 필수 검사로 둔다.
   # 검사 잡을 추가하면(예: SDD 스펙 검사) needs 에만 더한다.

@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class KakaoOAuthClientTest {
     private val server = MockWebServer()
@@ -115,6 +116,18 @@ class KakaoOAuthClientTest {
         val error = assertFailsWith<AppException> { client.fetchUser("auth-code") }
 
         assertEquals(AuthError.AUTH_OAUTH_UNAVAILABLE, error.errorCode)
+    }
+
+    @Test
+    fun `카카오 오류 응답 본문은 예외와 그 원인에 남기지 않는다`() {
+        server.enqueue(json(200, """{"access_token":"kakao-access","token_type":"bearer","expires_in":21599}"""))
+        server.enqueue(json(500, """{"msg":"kakao-body-marker","code":-1}"""))
+
+        val error = assertFailsWith<AppException> { client.fetchUser("auth-code") }
+
+        assertEquals(AuthError.AUTH_OAUTH_UNAVAILABLE, error.errorCode)
+        val messages = generateSequence<Throwable>(error) { it.cause }.mapNotNull { it.message }.toList()
+        assertTrue(messages.none { "kakao-body-marker" in it }, "예외 메시지에 응답 본문이 남았다: $messages")
     }
 
     @Test

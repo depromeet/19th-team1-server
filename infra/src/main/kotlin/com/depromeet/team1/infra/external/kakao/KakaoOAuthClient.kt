@@ -72,20 +72,23 @@ class KakaoOAuthClient(private val properties: KakaoProperties) : OAuthClient {
             .body(KakaoUserResponse::class.java)
     } ?: throw unavailable("사용자 조회", "빈 응답")
 
-    /** 카카오 호출의 오류를 내부 예외로 바꾼다. 이미 바꾼 [AppException] 은 그대로 던진다. */
+    /**
+     * 카카오 호출의 오류를 내부 예외로 바꾼다. 이미 바꾼 [AppException] 은 그대로 던진다.
+     * 원인 예외는 붙이지 않고 종류만 남긴다. 원인의 메시지에 카카오 응답 본문이 들어 있어 에러 로그에 그대로 찍히기 때문이다.
+     */
     private fun <T> call(step: String, block: () -> T): T = try {
         block()
     } catch (e: AppException) {
         throw e
     } catch (e: RestClientResponseException) {
-        throw unavailable(step, "status=${e.statusCode.value()}", e)
+        throw unavailable(step, "status=${e.statusCode.value()} ${e.javaClass.simpleName}")
     } catch (e: RestClientException) {
-        throw unavailable(step, e.javaClass.simpleName, e)
+        throw unavailable(step, e.javaClass.simpleName)
     }
 
-    private fun unavailable(step: String, reason: String, cause: Throwable? = null): AppException {
+    private fun unavailable(step: String, reason: String): AppException {
         log.warn("카카오 {} 실패: {}", step, reason)
-        return AppException(AuthError.AUTH_OAUTH_UNAVAILABLE, "kakao $step: $reason", cause)
+        return AppException(AuthError.AUTH_OAUTH_UNAVAILABLE, "kakao $step: $reason")
     }
 
     companion object {

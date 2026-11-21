@@ -181,10 +181,27 @@ curl -fsS https://<SITE_ADDRESS>/actuator/health   # 200, {"status":"UP"}. 인�
 docker stats --no-stream                            # 메모리 확인
 ```
 
-- 새 이미지 배포는 3절 명령(`docker compose pull app && docker compose up -d --no-deps app`)을 `/srv/team1`에서 실행한다.
+- 새 이미지 배포는 3절 명령(`docker compose pull app && docker compose up -d --no-deps app`)을 `/srv/team1`에서 실행한다. `develop` 푸시에서는 CI가 실행한다(아래 "자동 배포").
 - 되돌리기는 `.env`의 `APP_IMAGE_TAG`를 이력 태그(3절)로 바꾸고 같은 명령을 실행한다. 되돌린 뒤에는 원래 태그(`develop`·`main`)로 돌려놓아야 다음 배포가 최신 이미지를 받는다.
 - `.env`를 고친 뒤에는 `docker compose up -d --force-recreate app`으로 앱을 다시 만든다. `docker compose restart`는 `.env`를 다시 읽지 않는다.
 - `docker compose down`은 쓰지 않는다. 모든 컨테이너를 멈추고 지워 DB와 HTTPS까지 끊기고, `-v`를 붙이면 인증서 볼륨이 지워져 인증서를 다시 받아야 한다.
+
+### 자동 배포
+
+`develop` 푸시에서 CI가 `develop` 이미지를 올린 뒤 `deploy-dev` 잡이 서버에 반영한다([ci.md](ci.md)).
+
+1. `deploy` 사용자로 SSH 접속해 `/srv/team1`에서 3절 명령을 실행한다.
+2. 상태 확인 주소가 2분 안에 `{"status":"UP"}`을 돌려주는지 본다. 안 되면 잡이 실패한다. 자동으로 되돌리지 않는다.
+
+- 서버가 받는 태그는 서버 `.env`의 `APP_IMAGE_TAG`다. CI는 `.env`와 `compose.yaml`을 고치지 않는다. 레포의 `deploy/` 파일을 바꾸면 서버에 사람이 복사한다.
+- 접속 정보는 GitHub Environment `dev`에 둔다.
+
+| 종류 | 이름 | 값 |
+| --- | --- | --- |
+| Secret | `DEPLOY_SSH_KEY` | 배포 전용 SSH 개인키. 공개키는 서버 `deploy` 사용자에 등록한다 |
+| Variable | `DEPLOY_HOST`, `DEPLOY_USER` | 서버 고정 IP, `deploy` |
+| Variable | `DEPLOY_KNOWN_HOSTS` | 서버 호스트 키 한 줄(`ssh-keyscan -t ed25519 <고정 IP>`). 다른 키면 접속하지 않는다 |
+| Variable | `DEV_HEALTH_URL` | `https://<SITE_ADDRESS>/actuator/health` |
 
 ## 8. 로컬 실행
 

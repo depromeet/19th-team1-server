@@ -40,7 +40,7 @@
 | 꺼내기 | 홈 관심사 카드, 채팅 검색, 열람 로그 | 채팅 검색 대상·결과 개수·지난 대화 저장(결정 대기 9) |
 | 예약 작업 | 멈춘 작업 회수·남은 작업 재발행, 주간 푸시 대상 선정 | — |
 | 알림 | 채널과 무관한 발송 기반 | 웹 푸시는 처리하지 않는다. 앱 푸시는 앱 출시 후 |
-| 인증 | 카카오 로그인, "현재 사용자" 추상화 | 토큰 방식(결정 대기 6), 구글 로그인(결정 대기 5) |
+| 인증 | 카카오 로그인, JWT 액세스·리프레시 토큰(응답 본문 전달, 리프레시 로테이션), "현재 사용자" 추상화 | 구글 로그인(결정 대기 5) |
 | 탈퇴 | 카카오 연결 끊기. 데이터는 프리런칭 기간 동안 보관 | 보관 근거·기간·프리런칭 후 처리(결정 대기 11) |
 
 ## 4. 배포 구성
@@ -73,7 +73,7 @@ flowchart TB
 | 모듈 | 역할 | 의존 가능 대상 | 쓸 수 있는 기술 |
 | --- | --- | --- | --- |
 | `core` | 도메인 모델, 서비스, 경계 인터페이스 | 없음 | Spring의 DI·트랜잭션 어노테이션까지. JPA, 웹, HTTP 클라이언트, LLM SDK 금지 |
-| `infra` | 경계 인터페이스의 구현. DB(`storage`)와 외부 연동(`external`)을 패키지로 나눈다 | `core` | JPA, PostgreSQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, AWS SDK(SQS), 푸시 SDK |
+| `infra` | 경계 인터페이스의 구현. DB(`storage`), 외부 연동(`external`), 토큰 서명·검증(`security`)을 패키지로 나눈다 | `core` | JPA, PostgreSQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, AWS SDK(SQS), 푸시 SDK, Spring Security JOSE(JWT) |
 | `api` | 요청으로 시작하는 진입점(컨트롤러)과 설정. 실행 모듈 | `core` (코드에서), `infra`·`worker` (실행 시 조립만) | Spring MVC, springdoc, actuator |
 | `worker` | 요청 없이 도는 진입점(작업 큐 수신, 스케줄러) | `core` | Spring의 스케줄링 |
 
@@ -130,7 +130,10 @@ infra       com.depromeet.team1.infra
 │   ├── llm/            LLM 클라이언트, 분석기 구현
 │   ├── link/           링크 본문·메타데이터 수집 구현
 │   ├── queue/          SQS 작업 큐 구현
-│   └── push/           알림 발송 구현
+│   ├── push/           알림 발송 구현
+│   └── kakao/          카카오 로그인 구현(OAuthClient)
+├── security/
+│   └── jwt/            액세스 토큰 발급 구현(AccessTokenIssuer), JWT 서명 키, 검증용 JwtDecoder 빈
 └── resources/db/migration/   Flyway 스크립트
 
 api         com.depromeet.team1.api    (실행 클래스 ApiApplication 만 com.depromeet.team1 에 둔다)
@@ -161,7 +164,7 @@ worker      com.depromeet.team1.worker
 
 ## 7. 도메인 모델
 
-프리런칭 범위의 테이블 12개와 처리 작업 규칙이다. 범위는 `docs/plan/scope.md`를 따른다.
+프리런칭 범위의 테이블 14개와 처리 작업 규칙이다. 범위는 `docs/plan/scope.md`를 따른다.
 
 ### 공통 규칙
 
@@ -179,6 +182,8 @@ worker      com.depromeet.team1.worker
 | 회원 | member | 공통 회원 정보 |
 | 회원 | member_credential | 로그인 수단. 회원 1 : N |
 | 회원 | member_interest_category | 홈에서 고른 관심 카테고리 |
+| 회원 | member_terms_agreement | 약관 동의 이력. 동의할 때마다 행 추가 |
+| 인증 | refresh_token | 리프레시 토큰의 해시. 원문은 저장하지 않음 |
 | 저장물 | saved_item | 링크 한 건과 수집·분석 결과 |
 | 저장물 | saved_item_keyword | 저장물별 주제어 3~5개 |
 | 저장물 | saved_item_embedding | 저장물별 검색 벡터. 1 : 1 |
@@ -202,6 +207,8 @@ worker      com.depromeet.team1.worker
 erDiagram
     member ||--o{ member_credential : "로그인 수단"
     member ||--o{ member_interest_category : "관심 카테고리"
+    member ||--o{ member_terms_agreement : "약관 동의"
+    member ||--o{ refresh_token : "리프레시 토큰"
     member ||--o{ saved_item : "저장"
     saved_item ||--o{ saved_item_keyword : "주제어"
     saved_item ||--o| saved_item_embedding : "검색 벡터"
@@ -230,6 +237,20 @@ erDiagram
     member_interest_category {
         bigint member_id PK
         varchar category PK
+    }
+    member_terms_agreement {
+        bigint id PK
+        bigint member_id
+        varchar terms_type "UK(member_id, terms_version)"
+        varchar terms_version
+        timestamptz agreed_at
+    }
+    refresh_token {
+        bigint id PK
+        bigint member_id
+        varchar token_hash "UK"
+        timestamptz expires_at
+        timestamptz revoked_at "NULL"
     }
     saved_item {
         bigint id PK
@@ -310,6 +331,8 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | member_credential.member_id | member | N : 1 | 같은 애그리거트 | 탈퇴 시 `revoked_at` 기록, 행은 보관 |
 | member_interest_category.member_id | member | N : 1 | 같은 애그리거트 | 보관 |
+| member_terms_agreement.member_id | member | N : 1 | 같은 애그리거트 | 보관 |
+| refresh_token.member_id | member | N : 1 | 다른 애그리거트(인증) | 로그아웃하면 그 행, 탈취를 감지하면 회원의 행을 모두 지운다. 탈퇴 처리는 E2-2 |
 | saved_item.member_id | member | N : 1 | 다른 애그리거트(ID 참조) | 탈퇴해도 보관 |
 | saved_item_keyword.saved_item_id | saved_item | N : 1 | 같은 애그리거트 | 재분석 때 교체 |
 | saved_item_embedding.saved_item_id | saved_item | 1 : 1 | 같은 애그리거트 | EMBED가 다시 만듦 |
@@ -355,6 +378,25 @@ erDiagram
 | member_id | bigint | N | PK(member_id, category). 별도 id 없음 |
 | category | varchar(30) | N | 기본 카테고리 코드 |
 | created_at | timestamptz | N | |
+
+#### member_terms_agreement
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member |
+| terms_type | varchar(30) | N | 약관 종류 코드(`core`의 `TermsType`). 종류·필수 여부는 `scope.md` 결정 대기 11 |
+| terms_version | varchar(20) | N | 동의한 약관 버전. 버전이 바뀌면 다시 동의받는다 |
+| agreed_at | timestamptz | N | 동의 시각 |
+
+#### refresh_token
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member |
+| token_hash | varchar(64) | N | 토큰 원문의 SHA-256(16진수). 원문은 저장하지 않음 |
+| expires_at | timestamptz | N | 만료 시각 |
+| created_at | timestamptz | N | 발급 시각 |
+| revoked_at | timestamptz | Y | 재발급(로테이션)으로 폐기한 시각. 이 시각부터 유예 시간 안에 다시 오면 새 토큰 쌍을 주고, 지나서 오면 탈취로 본다. 로그아웃·탈취 감지는 기록하지 않고 행을 지운다 |
 
 #### saved_item
 
@@ -471,6 +513,9 @@ erDiagram
 | --- | --- | --- |
 | member_credential | UNIQUE (provider, provider_user_id) WHERE revoked_at IS NULL | 로그인. 탈퇴 후 같은 카카오 계정으로 재가입 가능 |
 | member_credential | (member_id) | 탈퇴 처리 |
+| member_terms_agreement | UNIQUE (member_id, terms_type, terms_version) | 같은 버전 중복 동의 방지, 회원별 조회 |
+| refresh_token | UNIQUE (token_hash) | 재발급·로그아웃 |
+| refresh_token | (member_id) | 탈취 감지 때 회원의 토큰을 폐기 여부와 무관하게 모두 삭제 |
 | saved_item | UNIQUE (member_id, normalized_url_hash) WHERE deleted_at IS NULL | 중복 저장 방지. 삭제 후 재저장은 새 행 |
 | saved_item | (member_id, category, created_at DESC, id DESC) WHERE deleted_at IS NULL | 카테고리별 목록, 카테고리별 개수 |
 | saved_item | (member_id, created_at DESC, id DESC) WHERE deleted_at IS NULL | 전체 목록, 처리 중 표시, 홈의 기간 집계 |
@@ -590,7 +635,6 @@ stateDiagram-v2
 | 이미지 저장물 | `item_type`(기본값 LINK) 추가, URL 컬럼 NULL 허용, 이미지 키 컬럼 |
 | 개인 카테고리 | 개인 카테고리 테이블, saved_item에 개인 카테고리 ID·출처 |
 | 알림 발송·수신 설정·기기 | E7 착수 때 설계 |
-| 약관 동의 이력 | 약관 종류·버전·동의 시각 테이블 |
 | 화면 이벤트 수집 | 클라이언트 이벤트 ID, 수신 시각 |
 | 외부용 ID | 공유가 생기면 공유 테이블 |
 | 회원별 동시 처리 제한 | `processing_job.member_id` |
@@ -612,6 +656,8 @@ stateDiagram-v2
 | 인터페이스 (`core`) | 역할 | 구현 (`infra`) |
 | --- | --- | --- |
 | `XxxRepository` | 도메인 모델 저장·조회 | PostgreSQL 구현. 필요하면 다른 DB 구현을 더한다 |
+| `OAuthClient` | 소셜 로그인 인가 코드 → 제공자 사용자 정보 | 제공자별 구현. 지금은 카카오만 (구글은 결정 대기 5) |
+| `AccessTokenIssuer` | 액세스 토큰 발급 | HS256 JWT. 검증은 같은 키의 `JwtDecoder` 빈으로 api 의 Resource Server 가 한다 |
 | `ItemAnalyzer` | 저장물 → 요약·카테고리·주제어 | 텍스트 LLM 분석기 |
 | `LlmClient` | LLM 호출 | 선택한 LLM 벤더 클라이언트 (결정 대기 10) |
 | `JobQueue` | 작업 발행·받기·메시지 삭제 | SQS |
@@ -620,7 +666,8 @@ stateDiagram-v2
 | `NotificationSender` | 알림 발송 | 채널별 구현. 웹 푸시 구현은 두지 않는다 |
 
 - **LLM 사용량 상한**(`core`의 `LlmUsageGuard`): 호출 전에 검사한다. 사용자별 상한과 전체 상한을 따로 둔다. 상한에 걸린 처리 작업은 재시도하지 않고 실패로 끝낸다(아래 비동기 처리 흐름).
-- **현재 사용자**: 컨트롤러는 "현재 사용자 ID"만 받는다. 해석 방법은 `api`의 한 곳에 둔다. 카카오 로그인이 들어오기 전에는 `local`·`dev`에서만 동작하는 헤더 방식을 쓴다.
+- **현재 사용자**: 컨트롤러는 `@CurrentMemberId memberId: Long`으로 "현재 사용자 ID"만 받는다. 해석은 `api`의 `web/common/CurrentMemberIdArgumentResolver` 한 곳에서 액세스 토큰의 회원 번호(sub)로 한다. 프로필별 헤더 방식은 두지 않는다. `local`도 카카오 로그인으로 토큰을 받는다.
+- **인증**: 웹은 `Authorization: Bearer <액세스 토큰>`으로 요청한다. 검증은 Spring Security Resource Server(`api/config/SecurityConfig`)가 infra 의 `JwtDecoder` 빈으로 한다. `/actuator/health`, Swagger, `POST /api/v1/auth/**`(로그인·재발급·로그아웃)만 토큰 없이 부르고, 인증 API 에서는 Authorization 헤더를 읽지 않는다. 인증 실패는 401 이고, 만료는 `AUTH_TOKEN_EXPIRED`, 없음·위조는 `AUTH_UNAUTHORIZED`다(`web/common/AuthenticationErrorEntryPoint`). 웹은 만료 코드를 받으면 재발급하고, 재발급이 `AUTH_INVALID_REFRESH_TOKEN`이면 재로그인을 안내한다. 재발급으로 폐기된 리프레시 토큰이 다시 오면, 폐기된 지 유예 시간(기본 30초, `AUTH_REFRESH_TOKEN_REUSE_GRACE`) 안이면 동시 재발급으로 보고 새 토큰 쌍을 주고, 지났으면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운 뒤 401 이다. 로그아웃하면 그 토큰 행을 지우고, 지워진 토큰은 모르는 토큰과 같게 401 이다. 탈퇴한 회원의 리프레시 토큰이 오면 그 회원의 토큰을 모두 지우고 401 이다.
 - **꺼내기**: 홈 관심사 카드와 채팅 검색이다. 둘 다 저장물 조회와 열람 로그 기록을 공통으로 쓴다. 채팅 검색의 임베딩은 PostgreSQL에 `bytea`로 저장하고 유사도는 앱에서 계산한다.
 - **알림**: 발송 대상 선정과 발송 기록은 채널과 무관하게 서비스가 하고, 채널별 전송만 `NotificationSender` 구현이 한다. 앱 푸시를 더해도 발송 로직은 그대로다.
 
@@ -701,7 +748,7 @@ sequenceDiagram
   - 성공: `{ "data": { ... } }`
   - 실패: `{ "code": "ITEM_NOT_FOUND", "message": "..." }`
 - **에러 처리**
-  - 도메인은 HTTP를 모른다. 에러 코드는 분류(`ErrorCategory`: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `INTERNAL`)만 가지고, HTTP 상태는 `api`가 분류를 보고 정한다. 분류는 쓸 곳이 생길 때 추가한다(인증, 외부 연동 실패 등).
+  - 도메인은 HTTP를 모른다. 에러 코드는 분류(`ErrorCategory`: `BAD_REQUEST`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL`)만 가지고, HTTP 상태는 `api`가 분류를 보고 정한다. 분류는 쓸 곳이 생길 때 추가한다(외부 연동 실패 등).
   - 에러 코드는 `ErrorCode`를 구현한 기능별 enum으로 `core`의 해당 기능 패키지에 둔다. 응답의 `code`는 enum 이름이고, 기능 간 겹치지 않게 기능 이름으로 시작한다 (예: `ITEM_NOT_FOUND`). 공통 코드는 `core/common/error/CommonError`.
   - 서비스는 `AppException(에러 코드, 상세)`를 던진다.
   - 응답 메시지는 에러 코드에 정의된 문구만 쓴다. 상세 사유는 로그에만 남긴다.
@@ -751,7 +798,8 @@ sequenceDiagram
 | 저장물 삭제는 소프트 딜리트 | 사용자에게서는 사라지고, 데이터는 남겨 분석에 쓴다 |
 | 탈퇴는 카카오 연결만 끊고 데이터는 프리런칭 기간 동안 보관 | 프리런칭 데이터를 분석에 쓴다. 보관 근거와 기간은 결정 대기 11 |
 | 웹 푸시는 처리하지 않고 채널과 무관한 발송 기반만 | 웹팀이 웹 푸시를 구현하지 않는다. 앱 푸시는 앱(프리런칭 이후)에서 채널 구현만 더한다 |
-| 웹과 API는 같은 도메인 아래 서브도메인 | 같은 사이트로 취급돼 인증 쿠키가 서드파티 쿠키 차단(Safari 등)에 걸리지 않는다. 인증 방식(쿠키·JWT)이 정해지지 않아(결정 대기 6) 어느 쪽으로 정해도 막히지 않게 둔다. 도메인은 하나만 사면 되고, 인증서도 같은 도메인 아래에서 관리한다 |
+| 인증은 JWT(Spring Security OAuth2 Resource Server). 토큰은 응답 본문으로 주고 리프레시는 해시로 저장해 로테이션 | 앱이 붙어도 웹과 같은 API를 쓴다. 서명·검증은 Spring Security가 하고 라이브러리 버전은 BOM이 관리한다. 리프레시 원문을 저장하지 않아 DB가 유출돼도 토큰을 쓸 수 없고, 로테이션으로 탈취된 토큰의 재사용을 막는다. 토큰 세부(만료 시간, 전달 방식)는 관례대로 두고 웹 요청이 오면 바꾼다 |
+| 웹과 API는 같은 도메인 아래 서브도메인 | 같은 사이트로 취급돼 인증 쿠키가 서드파티 쿠키 차단(Safari 등)에 걸리지 않는다. 웹팀이 리프레시 토큰을 httpOnly 쿠키로 받기를 원할 때도 막히지 않는다. 도메인은 하나만 사면 되고, 인증서도 같은 도메인 아래에서 관리한다 |
 | 임베딩은 PostgreSQL `bytea`에 저장하고 유사도는 앱에서 계산 | 사용자 30명 × 수백 건이면 앱 계산으로 충분하고, DB나 확장을 더하지 않아도 된다. 한계가 오면 pgvector를 붙인다 |
 
 ## 11. 남은 결정
@@ -764,7 +812,6 @@ sequenceDiagram
 | 4 | 응답 포맷 | 9장 형태로 구현해 두었다. 웹팀 확인 후 확정 | 서버 + 웹 |
 | 5 | API 규격 관리 방식 | 문서로 관리하고 Swagger는 참고용으로 두는 안. 웹·디자인과 함께 쓰는 에이전트용 레포를 만들지와 같이 정한다 | 팀 / 다음 회의 |
 | 6 | 열람 진입 경로 전달 방식 | 상세 조회 파라미터 | 서버 + 웹 |
-| 7 | 인증 토큰 방식 | 카카오 로그인은 정해졌다. 쿠키·JWT는 결정 대기 6 | 서버 + 웹 |
 | 8 | 서버를 올릴 클라우드 | 작업 큐가 SQS라 AWS 계정은 필요하다 | 개발 서버 구성(E1-2) |
 | 9 | LLM 벤더와 예산 | 결정 대기 10 | 서버 (E4-1 결과) |
 | 10 | 링크 본문 수집 방식 | 차단 사이트 처리, 내부망 주소 호출 방지 필요. 수집 범위는 결정 대기 1 | 서버 (E4-3) |

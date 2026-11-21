@@ -24,6 +24,10 @@ spring:
   flyway:
     locations: classpath:db/migration
 
+# 카카오 로그인 앱 정보(kakao.*)는 환경변수 KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, KAKAO_REDIRECT_URI 로만 받는다.
+# 여기에 ${...} 로 적지 않는다. 값이 없을 때 자리표시자 문자열이 그대로 들어가 비어 있는지 검사할 수 없다.
+# 비어 있으면 dev·prod 는 기동하지 않고, local 은 경고를 남기고 뜬 뒤 로그인 요청만 실패한다(KakaoConfiguration).
+
 # 처리 작업과 작업 큐(docs/deployment.md 6절). 기본값은 운영 값을 정하기 전의 임시 값이다.
 job:
   queue:

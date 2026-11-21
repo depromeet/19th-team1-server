@@ -66,5 +66,6 @@ class GlobalExceptionHandler {
         ErrorCategory.NOT_FOUND -> HttpStatus.NOT_FOUND
         ErrorCategory.CONFLICT -> HttpStatus.CONFLICT
         ErrorCategory.INTERNAL -> HttpStatus.INTERNAL_SERVER_ERROR
+        ErrorCategory.UNAUTHORIZED -> HttpStatus.UNAUTHORIZED
     }
 }

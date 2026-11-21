@@ -16,6 +16,16 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
+    // 외부 연동(카카오 등)의 HTTP 호출
+    implementation("org.springframework:spring-web")
+    implementation("tools.jackson.module:jackson-module-kotlin")
+
+    // 액세스 토큰(JWT) 서명·검증. api 의 Resource Server 가 여기서 만든 JwtDecoder 빈으로 검증한다.
+    implementation("org.springframework.security:spring-security-oauth2-jose")
+
+    // 외부 연동 클라이언트 테스트용 가짜 HTTP 서버
+    testImplementation(libs.mockwebserver)
+
     // 작업 큐(SQS). 버전은 AWS SDK BOM 이 정한다.
     implementation(platform(libs.aws.sdk.bom))
     implementation("software.amazon.awssdk:sqs")

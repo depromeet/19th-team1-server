@@ -2,6 +2,7 @@ package com.depromeet.team1.api.web.common
 
 import com.depromeet.team1.core.common.error.AppException
 import com.depromeet.team1.core.common.error.CommonError
+import com.depromeet.team1.core.member.AuthError
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
@@ -38,6 +39,14 @@ class GlobalExceptionHandlerTest {
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
             .andExpect(jsonPath("$.message").value(CommonError.RESOURCE_NOT_FOUND.message))
+    }
+
+    @Test
+    fun `인증 실패 분류의 AppException 은 401 로 응답한다`() {
+        mockMvc
+            .perform(get("/sample/unauthorized"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("AUTH_INVALID_REFRESH_TOKEN"))
     }
 
     @Test
@@ -80,6 +89,9 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/sample/not-found")
         fun notFound(): ApiResponse<Unit> = throw AppException(CommonError.RESOURCE_NOT_FOUND, "sample id=1")
+
+        @GetMapping("/sample/unauthorized")
+        fun unauthorized(): ApiResponse<Unit> = throw AppException(AuthError.AUTH_INVALID_REFRESH_TOKEN, "sample")
 
         @GetMapping("/sample/unexpected")
         fun unexpected(): ApiResponse<Unit> = throw IllegalStateException("내부 상태 메시지")

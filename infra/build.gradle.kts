@@ -20,6 +20,9 @@ dependencies {
     implementation("org.springframework:spring-web")
     implementation("tools.jackson.module:jackson-module-kotlin")
 
+    // 액세스 토큰(JWT) 서명·검증. api 의 Resource Server 가 여기서 만든 JwtDecoder 빈으로 검증한다.
+    implementation("org.springframework.security:spring-security-oauth2-jose")
+
     // 외부 연동 클라이언트 테스트용 가짜 HTTP 서버
     testImplementation(libs.mockwebserver)
 

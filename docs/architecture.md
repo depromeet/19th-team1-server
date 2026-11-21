@@ -73,7 +73,7 @@ flowchart TB
 | 모듈 | 역할 | 의존 가능 대상 | 쓸 수 있는 기술 |
 | --- | --- | --- | --- |
 | `core` | 도메인 모델, 서비스, 경계 인터페이스 | 없음 | Spring의 DI·트랜잭션 어노테이션까지. JPA, 웹, HTTP 클라이언트, LLM SDK 금지 |
-| `infra` | 경계 인터페이스의 구현. DB(`storage`)와 외부 연동(`external`)을 패키지로 나눈다 | `core` | JPA, PostgreSQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, AWS SDK(SQS), 푸시 SDK |
+| `infra` | 경계 인터페이스의 구현. DB(`storage`), 외부 연동(`external`), 토큰 서명·검증(`security`)을 패키지로 나눈다 | `core` | JPA, PostgreSQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, AWS SDK(SQS), 푸시 SDK, Spring Security JOSE(JWT) |
 | `api` | 요청으로 시작하는 진입점(컨트롤러)과 설정. 실행 모듈 | `core` (코드에서), `infra`·`worker` (실행 시 조립만) | Spring MVC, springdoc, actuator |
 | `worker` | 요청 없이 도는 진입점(작업 큐 수신, 스케줄러) | `core` | Spring의 스케줄링 |
 
@@ -130,7 +130,10 @@ infra       com.depromeet.team1.infra
 │   ├── llm/            LLM 클라이언트, 분석기 구현
 │   ├── link/           링크 본문·메타데이터 수집 구현
 │   ├── queue/          SQS 작업 큐 구현
-│   └── push/           알림 발송 구현
+│   ├── push/           알림 발송 구현
+│   └── kakao/          카카오 로그인 구현(OAuthClient)
+├── security/
+│   └── jwt/            액세스 토큰 발급 구현(AccessTokenIssuer), JWT 서명 키, 검증용 JwtDecoder 빈
 └── resources/db/migration/   Flyway 스크립트
 
 api         com.depromeet.team1.api    (실행 클래스 ApiApplication 만 com.depromeet.team1 에 둔다)
@@ -161,7 +164,7 @@ worker      com.depromeet.team1.worker
 
 ## 7. 도메인 모델
 
-프리런칭 범위의 테이블 12개와 처리 작업 규칙이다. 범위는 `docs/plan/scope.md`를 따른다.
+프리런칭 범위의 테이블 14개와 처리 작업 규칙이다. 범위는 `docs/plan/scope.md`를 따른다.
 
 ### 공통 규칙
 
@@ -179,6 +182,8 @@ worker      com.depromeet.team1.worker
 | 회원 | member | 공통 회원 정보 |
 | 회원 | member_credential | 로그인 수단. 회원 1 : N |
 | 회원 | member_interest_category | 홈에서 고른 관심 카테고리 |
+| 회원 | member_terms_agreement | 약관 동의 이력. 동의할 때마다 행 추가 |
+| 인증 | refresh_token | 리프레시 토큰의 해시. 원문은 저장하지 않음 |
 | 저장물 | saved_item | 링크 한 건과 수집·분석 결과 |
 | 저장물 | saved_item_keyword | 저장물별 주제어 3~5개 |
 | 저장물 | saved_item_embedding | 저장물별 검색 벡터. 1 : 1 |
@@ -202,6 +207,8 @@ worker      com.depromeet.team1.worker
 erDiagram
     member ||--o{ member_credential : "로그인 수단"
     member ||--o{ member_interest_category : "관심 카테고리"
+    member ||--o{ member_terms_agreement : "약관 동의"
+    member ||--o{ refresh_token : "리프레시 토큰"
     member ||--o{ saved_item : "저장"
     saved_item ||--o{ saved_item_keyword : "주제어"
     saved_item ||--o| saved_item_embedding : "검색 벡터"
@@ -230,6 +237,20 @@ erDiagram
     member_interest_category {
         bigint member_id PK
         varchar category PK
+    }
+    member_terms_agreement {
+        bigint id PK
+        bigint member_id
+        varchar terms_type "UK(member_id, terms_version)"
+        varchar terms_version
+        timestamptz agreed_at
+    }
+    refresh_token {
+        bigint id PK
+        bigint member_id
+        varchar token_hash "UK"
+        timestamptz expires_at
+        timestamptz revoked_at "NULL"
     }
     saved_item {
         bigint id PK
@@ -310,6 +331,8 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | member_credential.member_id | member | N : 1 | 같은 애그리거트 | 탈퇴 시 `revoked_at` 기록, 행은 보관 |
 | member_interest_category.member_id | member | N : 1 | 같은 애그리거트 | 보관 |
+| member_terms_agreement.member_id | member | N : 1 | 같은 애그리거트 | 보관 |
+| refresh_token.member_id | member | N : 1 | 다른 애그리거트(인증) | 탈퇴 시 살아 있는 토큰에 `revoked_at` 기록 |
 | saved_item.member_id | member | N : 1 | 다른 애그리거트(ID 참조) | 탈퇴해도 보관 |
 | saved_item_keyword.saved_item_id | saved_item | N : 1 | 같은 애그리거트 | 재분석 때 교체 |
 | saved_item_embedding.saved_item_id | saved_item | 1 : 1 | 같은 애그리거트 | EMBED가 다시 만듦 |
@@ -355,6 +378,25 @@ erDiagram
 | member_id | bigint | N | PK(member_id, category). 별도 id 없음 |
 | category | varchar(30) | N | 기본 카테고리 코드 |
 | created_at | timestamptz | N | |
+
+#### member_terms_agreement
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member |
+| terms_type | varchar(30) | N | 약관 종류 코드(`core`의 `TermsType`). 종류·필수 여부는 `scope.md` 결정 대기 11 |
+| terms_version | varchar(20) | N | 동의한 약관 버전. 버전이 바뀌면 다시 동의받는다 |
+| agreed_at | timestamptz | N | 동의 시각 |
+
+#### refresh_token
+
+| 컬럼 | 타입 | NULL | 설명 |
+| --- | --- | --- | --- |
+| member_id | bigint | N | 참조 member |
+| token_hash | varchar(64) | N | 토큰 원문의 SHA-256(16진수). 원문은 저장하지 않음 |
+| expires_at | timestamptz | N | 만료 시각 |
+| created_at | timestamptz | N | 발급 시각 |
+| revoked_at | timestamptz | Y | 재발급(로테이션)·로그아웃·탈퇴로 폐기한 시각. 값이 있으면 쓰지 않음 |
 
 #### saved_item
 
@@ -471,6 +513,9 @@ erDiagram
 | --- | --- | --- |
 | member_credential | UNIQUE (provider, provider_user_id) WHERE revoked_at IS NULL | 로그인. 탈퇴 후 같은 카카오 계정으로 재가입 가능 |
 | member_credential | (member_id) | 탈퇴 처리 |
+| member_terms_agreement | UNIQUE (member_id, terms_type, terms_version) | 같은 버전 중복 동의 방지, 회원별 조회 |
+| refresh_token | UNIQUE (token_hash) | 재발급·로그아웃 |
+| refresh_token | (member_id) WHERE revoked_at IS NULL | 탈퇴·탈취 감지 때 회원의 살아 있는 토큰 폐기 |
 | saved_item | UNIQUE (member_id, normalized_url_hash) WHERE deleted_at IS NULL | 중복 저장 방지. 삭제 후 재저장은 새 행 |
 | saved_item | (member_id, category, created_at DESC, id DESC) WHERE deleted_at IS NULL | 카테고리별 목록, 카테고리별 개수 |
 | saved_item | (member_id, created_at DESC, id DESC) WHERE deleted_at IS NULL | 전체 목록, 처리 중 표시, 홈의 기간 집계 |
@@ -590,7 +635,6 @@ stateDiagram-v2
 | 이미지 저장물 | `item_type`(기본값 LINK) 추가, URL 컬럼 NULL 허용, 이미지 키 컬럼 |
 | 개인 카테고리 | 개인 카테고리 테이블, saved_item에 개인 카테고리 ID·출처 |
 | 알림 발송·수신 설정·기기 | E7 착수 때 설계 |
-| 약관 동의 이력 | 약관 종류·버전·동의 시각 테이블 |
 | 화면 이벤트 수집 | 클라이언트 이벤트 ID, 수신 시각 |
 | 외부용 ID | 공유가 생기면 공유 테이블 |
 | 회원별 동시 처리 제한 | `processing_job.member_id` |
@@ -612,6 +656,8 @@ stateDiagram-v2
 | 인터페이스 (`core`) | 역할 | 구현 (`infra`) |
 | --- | --- | --- |
 | `XxxRepository` | 도메인 모델 저장·조회 | PostgreSQL 구현. 필요하면 다른 DB 구현을 더한다 |
+| `OAuthClient` | 소셜 로그인 인가 코드 → 제공자 사용자 정보 | 제공자별 구현. 지금은 카카오만 (구글은 결정 대기 5) |
+| `AccessTokenIssuer` | 액세스 토큰 발급 | HS256 JWT. 검증은 같은 키의 `JwtDecoder` 빈으로 api 의 Resource Server 가 한다 |
 | `ItemAnalyzer` | 저장물 → 요약·카테고리·주제어 | 텍스트 LLM 분석기 |
 | `LlmClient` | LLM 호출 | 선택한 LLM 벤더 클라이언트 (결정 대기 10) |
 | `JobQueue` | 작업 발행·받기·메시지 삭제 | SQS |
@@ -700,7 +746,7 @@ sequenceDiagram
   - 성공: `{ "data": { ... } }`
   - 실패: `{ "code": "ITEM_NOT_FOUND", "message": "..." }`
 - **에러 처리**
-  - 도메인은 HTTP를 모른다. 에러 코드는 분류(`ErrorCategory`: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `INTERNAL`)만 가지고, HTTP 상태는 `api`가 분류를 보고 정한다. 분류는 쓸 곳이 생길 때 추가한다(인증, 외부 연동 실패 등).
+  - 도메인은 HTTP를 모른다. 에러 코드는 분류(`ErrorCategory`: `BAD_REQUEST`, `UNAUTHORIZED`, `NOT_FOUND`, `CONFLICT`, `INTERNAL`)만 가지고, HTTP 상태는 `api`가 분류를 보고 정한다. 분류는 쓸 곳이 생길 때 추가한다(외부 연동 실패 등).
   - 에러 코드는 `ErrorCode`를 구현한 기능별 enum으로 `core`의 해당 기능 패키지에 둔다. 응답의 `code`는 enum 이름이고, 기능 간 겹치지 않게 기능 이름으로 시작한다 (예: `ITEM_NOT_FOUND`). 공통 코드는 `core/common/error/CommonError`.
   - 서비스는 `AppException(에러 코드, 상세)`를 던진다.
   - 응답 메시지는 에러 코드에 정의된 문구만 쓴다. 상세 사유는 로그에만 남긴다.

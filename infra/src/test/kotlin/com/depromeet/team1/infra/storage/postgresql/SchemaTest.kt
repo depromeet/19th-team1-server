@@ -11,6 +11,6 @@ class SchemaTest : StorageTest() {
             Int::class.java,
         )
 
-        assertEquals(6, applied)
+        assertEquals(7, applied)
     }
 }

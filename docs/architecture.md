@@ -332,7 +332,7 @@ erDiagram
 | member_credential.member_id | member | N : 1 | 같은 애그리거트 | 탈퇴 시 `revoked_at` 기록, 행은 보관 |
 | member_interest_category.member_id | member | N : 1 | 같은 애그리거트 | 보관 |
 | member_terms_agreement.member_id | member | N : 1 | 같은 애그리거트 | 보관 |
-| refresh_token.member_id | member | N : 1 | 다른 애그리거트(인증) | 탈퇴 시 살아 있는 토큰에 `revoked_at` 기록 |
+| refresh_token.member_id | member | N : 1 | 다른 애그리거트(인증) | 로그아웃하면 그 행, 탈취를 감지하면 회원의 행을 모두 지운다. 탈퇴 처리는 E2-2 |
 | saved_item.member_id | member | N : 1 | 다른 애그리거트(ID 참조) | 탈퇴해도 보관 |
 | saved_item_keyword.saved_item_id | saved_item | N : 1 | 같은 애그리거트 | 재분석 때 교체 |
 | saved_item_embedding.saved_item_id | saved_item | 1 : 1 | 같은 애그리거트 | EMBED가 다시 만듦 |
@@ -396,7 +396,7 @@ erDiagram
 | token_hash | varchar(64) | N | 토큰 원문의 SHA-256(16진수). 원문은 저장하지 않음 |
 | expires_at | timestamptz | N | 만료 시각 |
 | created_at | timestamptz | N | 발급 시각 |
-| revoked_at | timestamptz | Y | 재발급(로테이션)·로그아웃·탈퇴로 폐기한 시각. 값이 있으면 쓰지 않음 |
+| revoked_at | timestamptz | Y | 재발급(로테이션)으로 폐기한 시각. 이 시각부터 유예 시간 안에 다시 오면 새 토큰 쌍을 주고, 지나서 오면 탈취로 본다. 로그아웃·탈취 감지는 기록하지 않고 행을 지운다 |
 
 #### saved_item
 
@@ -515,7 +515,7 @@ erDiagram
 | member_credential | (member_id) | 탈퇴 처리 |
 | member_terms_agreement | UNIQUE (member_id, terms_type, terms_version) | 같은 버전 중복 동의 방지, 회원별 조회 |
 | refresh_token | UNIQUE (token_hash) | 재발급·로그아웃 |
-| refresh_token | (member_id) WHERE revoked_at IS NULL | 탈퇴·탈취 감지 때 회원의 살아 있는 토큰 폐기 |
+| refresh_token | (member_id) WHERE revoked_at IS NULL | 회원의 살아 있는 토큰 조회. 탈취 감지 삭제는 폐기된 행까지 지워 이 인덱스를 쓰지 못한다(30명 규모라 그대로 둠) |
 | saved_item | UNIQUE (member_id, normalized_url_hash) WHERE deleted_at IS NULL | 중복 저장 방지. 삭제 후 재저장은 새 행 |
 | saved_item | (member_id, category, created_at DESC, id DESC) WHERE deleted_at IS NULL | 카테고리별 목록, 카테고리별 개수 |
 | saved_item | (member_id, created_at DESC, id DESC) WHERE deleted_at IS NULL | 전체 목록, 처리 중 표시, 홈의 기간 집계 |
@@ -667,7 +667,7 @@ stateDiagram-v2
 
 - **LLM 사용량 상한**(`core`의 `LlmUsageGuard`): 호출 전에 검사한다. 사용자별 상한과 전체 상한을 따로 둔다. 상한에 걸린 처리 작업은 재시도하지 않고 실패로 끝낸다(아래 비동기 처리 흐름).
 - **현재 사용자**: 컨트롤러는 `@CurrentMemberId memberId: Long`으로 "현재 사용자 ID"만 받는다. 해석은 `api`의 `web/common/CurrentMemberIdArgumentResolver` 한 곳에서 액세스 토큰의 회원 번호(sub)로 한다. 프로필별 헤더 방식은 두지 않는다. `local`도 카카오 로그인으로 토큰을 받는다.
-- **인증**: 웹은 `Authorization: Bearer <액세스 토큰>`으로 요청한다. 검증은 Spring Security Resource Server(`api/config/SecurityConfig`)가 infra 의 `JwtDecoder` 빈으로 한다. `/actuator/health`, Swagger, `POST /api/v1/auth/**`(로그인·재발급·로그아웃)만 토큰 없이 부르고, 인증 API 에서는 Authorization 헤더를 읽지 않는다. 인증 실패는 401 이고, 만료는 `AUTH_TOKEN_EXPIRED`, 없음·위조는 `AUTH_UNAUTHORIZED`다(`web/common/AuthenticationErrorEntryPoint`). 웹은 만료 코드를 받으면 재발급하고, 재발급이 `AUTH_INVALID_REFRESH_TOKEN`이면 재로그인을 안내한다. 폐기된 리프레시 토큰이 다시 오면 거절하고, 폐기된 지 유예 시간(기본 30초, `AUTH_REFRESH_TOKEN_REUSE_GRACE`)이 지났으면 탈취로 보고 그 회원의 리프레시 토큰을 모두 폐기한다. 유예 시간 안이면 동시 재발급으로 보고 거절만 한다.
+- **인증**: 웹은 `Authorization: Bearer <액세스 토큰>`으로 요청한다. 검증은 Spring Security Resource Server(`api/config/SecurityConfig`)가 infra 의 `JwtDecoder` 빈으로 한다. `/actuator/health`, Swagger, `POST /api/v1/auth/**`(로그인·재발급·로그아웃)만 토큰 없이 부르고, 인증 API 에서는 Authorization 헤더를 읽지 않는다. 인증 실패는 401 이고, 만료는 `AUTH_TOKEN_EXPIRED`, 없음·위조는 `AUTH_UNAUTHORIZED`다(`web/common/AuthenticationErrorEntryPoint`). 웹은 만료 코드를 받으면 재발급하고, 재발급이 `AUTH_INVALID_REFRESH_TOKEN`이면 재로그인을 안내한다. 재발급으로 폐기된 리프레시 토큰이 다시 오면, 폐기된 지 유예 시간(기본 30초, `AUTH_REFRESH_TOKEN_REUSE_GRACE`) 안이면 동시 재발급으로 보고 새 토큰 쌍을 주고, 지났으면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운 뒤 401 이다. 로그아웃하면 그 토큰 행을 지우고, 지워진 토큰은 모르는 토큰과 같게 401 이다.
 - **꺼내기**: 홈 관심사 카드와 채팅 검색이다. 둘 다 저장물 조회와 열람 로그 기록을 공통으로 쓴다. 채팅 검색의 임베딩은 PostgreSQL에 `bytea`로 저장하고 유사도는 앱에서 계산한다.
 - **알림**: 발송 대상 선정과 발송 기록은 채널과 무관하게 서비스가 하고, 채널별 전송만 `NotificationSender` 구현이 한다. 앱 푸시를 더해도 발송 로직은 그대로다.
 

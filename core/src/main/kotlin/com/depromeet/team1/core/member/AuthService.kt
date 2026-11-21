@@ -55,48 +55,54 @@ class AuthService(
     }
 
     /**
-     * 리프레시 토큰으로 새 토큰 쌍을 발급하고 쓴 토큰은 폐기한다(로테이션).
-     * 이미 폐기된 토큰이 오면 거절한다. 폐기된 지 유예 시간([AuthSettings.refreshTokenReuseGrace])이 지났으면
-     * 탈취로 보고 그 회원의 살아 있는 리프레시 토큰을 모두 폐기한다. 유예 시간 안이면 동시 재발급으로 보고 거절만 한다.
+     * 리프레시 토큰으로 새 토큰 쌍을 발급하고 쓴 토큰은 폐기한다(로테이션, revoked_at 기록).
+     * 로테이션으로 폐기된 토큰이 다시 오면, 폐기된 지 유예 시간([AuthSettings.refreshTokenReuseGrace]) 안이면
+     * 동시 재발급으로 보고 새 토큰 쌍을 주고, 지났으면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운 뒤 거절한다.
+     * 로그아웃·탈취 감지로 지워진 토큰은 모르는 토큰과 같게 거절한다.
      *
-     * 트랜잭션을 걸지 않는다. 탈취 감지의 일괄 폐기는 거절 예외와 함께 롤백되면 안 되므로 저장소 메서드가 각각 커밋한다.
+     * 트랜잭션을 걸지 않는다. 탈취 감지의 일괄 삭제는 거절 예외와 함께 롤백되면 안 되므로 저장소 메서드가 각각 커밋한다.
      * 폐기 뒤 새 토큰 저장이 실패하면 사용자는 다시 로그인한다.
      */
     fun reissue(refreshToken: String): IssuedTokens {
         val now = clock.instant()
-        val stored = refreshTokenRepository.findByTokenHash(hash(refreshToken))
-            ?: throw AppException(AuthError.AUTH_INVALID_REFRESH_TOKEN, "발급하지 않은 리프레시 토큰")
-        if (stored.revokedAt != null) rejectReuse(stored, now)
-        if (!now.isBefore(stored.expiresAt)) {
-            throw AppException(AuthError.AUTH_INVALID_REFRESH_TOKEN, "만료된 리프레시 토큰 id=${stored.id}")
-        }
-        // 같은 토큰으로 동시에 재발급하면 조건부 폐기가 하나만 통과시킨다. 진 쪽은 다시 읽어 재사용 규칙을 적용한다.
+        val stored = refreshTokenRepository.findByTokenHash(hash(refreshToken)) ?: throw unknownRefreshToken()
+        if (stored.revokedAt != null) return reissueRotated(stored, now)
+        rejectIfExpired(stored, now)
+        // 같은 토큰으로 동시에 재발급하면 조건부 폐기가 하나만 통과시킨다. 진 쪽은 다시 읽어 로테이션된 토큰의 규칙을 적용한다.
         if (!refreshTokenRepository.revoke(stored.id!!, now)) {
-            rejectReuse(refreshTokenRepository.findByTokenHash(stored.tokenHash) ?: stored, now)
+            val current = refreshTokenRepository.findByTokenHash(stored.tokenHash) ?: throw unknownRefreshToken()
+            return reissueRotated(current, now)
         }
         return issueTokens(stored.memberId, now)
     }
 
-    /** 리프레시 토큰을 폐기한다. 모르는 토큰이거나 이미 폐기된 토큰이어도 실패하지 않는다. 다른 기기의 토큰은 그대로 둔다. */
+    /** 리프레시 토큰 행을 지운다. 모르는 토큰이어도 실패하지 않는다. 다른 기기의 토큰은 그대로 둔다. */
     fun logout(refreshToken: String) {
         val stored = refreshTokenRepository.findByTokenHash(hash(refreshToken)) ?: return
-        if (stored.revokedAt == null) refreshTokenRepository.revoke(stored.id!!, clock.instant())
+        refreshTokenRepository.delete(stored.id!!)
     }
 
-    private fun rejectReuse(stored: RefreshToken, now: Instant): Nothing {
-        val revokedAt = stored.revokedAt
-        if (revokedAt == null || !now.isAfter(revokedAt.plus(settings.refreshTokenReuseGrace))) {
+    /** 로테이션으로 이미 폐기된 토큰이 다시 왔다. */
+    private fun reissueRotated(stored: RefreshToken, now: Instant): IssuedTokens {
+        val revokedAt = checkNotNull(stored.revokedAt)
+        if (now.isAfter(revokedAt.plus(settings.refreshTokenReuseGrace))) {
+            val deleted = refreshTokenRepository.deleteAllByMemberId(stored.memberId)
             throw AppException(
                 AuthError.AUTH_INVALID_REFRESH_TOKEN,
-                "유예 시간 안의 리프레시 토큰 재사용(동시 재발급) id=${stored.id} memberId=${stored.memberId}",
+                "로테이션된 리프레시 토큰 재사용(탈취 감지) id=${stored.id} memberId=${stored.memberId}, 토큰 ${deleted}개 삭제",
             )
         }
-        val revoked = refreshTokenRepository.revokeAllActive(stored.memberId, now)
-        throw AppException(
-            AuthError.AUTH_INVALID_REFRESH_TOKEN,
-            "폐기된 리프레시 토큰 재사용 id=${stored.id} memberId=${stored.memberId}, 살아 있던 토큰 ${revoked}개 폐기",
-        )
+        rejectIfExpired(stored, now)
+        return issueTokens(stored.memberId, now)
     }
+
+    private fun rejectIfExpired(stored: RefreshToken, now: Instant) {
+        if (!now.isBefore(stored.expiresAt)) {
+            throw AppException(AuthError.AUTH_INVALID_REFRESH_TOKEN, "만료된 리프레시 토큰 id=${stored.id}")
+        }
+    }
+
+    private fun unknownRefreshToken() = AppException(AuthError.AUTH_INVALID_REFRESH_TOKEN, "모르는 리프레시 토큰(발급하지 않았거나 지워짐)")
 
     private fun issueTokens(memberId: Long, now: Instant): IssuedTokens {
         val accessToken = accessTokenIssuer.issue(memberId, now)

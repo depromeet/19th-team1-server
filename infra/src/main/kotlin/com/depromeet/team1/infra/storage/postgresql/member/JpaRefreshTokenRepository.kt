@@ -18,5 +18,10 @@ class JpaRefreshTokenRepository(private val jpaRepository: RefreshTokenJpaReposi
     override fun revoke(id: Long, now: Instant): Boolean = jpaRepository.revoke(id, now) == 1
 
     @Transactional
-    override fun revokeAllActive(memberId: Long, now: Instant): Int = jpaRepository.revokeAllActive(memberId, now)
+    override fun delete(id: Long) {
+        jpaRepository.deleteById(id)
+    }
+
+    @Transactional
+    override fun deleteAllByMemberId(memberId: Long): Int = jpaRepository.deleteAllByMemberId(memberId)
 }

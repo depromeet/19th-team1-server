@@ -18,6 +18,6 @@ class AuthConfig {
 
 @ConfigurationProperties("auth")
 data class AuthProperties(
-    /** 폐기된 리프레시 토큰을 탈취로 보지 않고 거절만 하는 시간. 웹의 동시 재발급을 감안한다. */
+    /** 재발급으로 폐기된 리프레시 토큰이 다시 와도 탈취로 보지 않고 새 토큰 쌍을 주는 시간. 웹의 동시 재발급을 감안한다. */
     val refreshTokenReuseGrace: Duration = Duration.ofSeconds(30),
 )

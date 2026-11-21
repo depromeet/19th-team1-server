@@ -4,7 +4,7 @@ import java.time.Duration
 
 /** 인증 설정값. 값은 api 의 설정(auth.*)에서 받는다. */
 data class AuthSettings(
-    /** 폐기된 리프레시 토큰이 이 시간 안에 다시 오면 동시 재발급으로 보고 거절만 한다. 지나서 오면 탈취로 본다. */
+    /** 로테이션으로 폐기된 리프레시 토큰이 이 시간 안에 다시 오면 동시 재발급으로 보고 새 토큰 쌍을 준다. 지나서 오면 탈취로 본다. */
     val refreshTokenReuseGrace: Duration,
 ) {
     init {

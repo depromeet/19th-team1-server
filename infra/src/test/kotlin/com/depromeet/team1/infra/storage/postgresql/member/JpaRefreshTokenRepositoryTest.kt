@@ -51,30 +51,29 @@ class JpaRefreshTokenRepositoryTest : StorageTest() {
     }
 
     @Test
-    fun `회원의 살아 있는 토큰만 모두 폐기한다`() {
-        val alreadyRevokedAt = NOW.minus(Duration.ofDays(1))
-        refreshTokenRepository.save(token(memberId = 1, hash = HASH_A))
-        refreshTokenRepository.save(token(memberId = 1, hash = HASH_B).copy(revokedAt = alreadyRevokedAt))
-        refreshTokenRepository.save(token(memberId = 1, hash = HASH_C))
-        refreshTokenRepository.save(token(memberId = 2, hash = HASH_D))
+    fun `토큰 행을 지운다`() {
+        val saved = refreshTokenRepository.save(token(memberId = 1, hash = HASH_A))
+        refreshTokenRepository.save(token(memberId = 1, hash = HASH_B))
 
-        val revoked = refreshTokenRepository.revokeAllActive(memberId = 1, now = NOW)
+        refreshTokenRepository.delete(saved.id!!)
 
-        assertEquals(2, revoked)
-        assertEquals(NOW, refreshTokenRepository.findByTokenHash(HASH_A)?.revokedAt)
-        assertEquals(alreadyRevokedAt, refreshTokenRepository.findByTokenHash(HASH_B)?.revokedAt)
-        assertEquals(NOW, refreshTokenRepository.findByTokenHash(HASH_C)?.revokedAt)
-        assertNull(refreshTokenRepository.findByTokenHash(HASH_D)?.revokedAt)
+        assertNull(refreshTokenRepository.findByTokenHash(HASH_A))
+        assertNotNull(refreshTokenRepository.findByTokenHash(HASH_B))
     }
 
     @Test
-    fun `폐기한 뒤 해시로 찾으면 폐기 시각이 보인다`() {
-        val saved = refreshTokenRepository.save(token(memberId = 1, hash = HASH_A))
+    fun `회원의 토큰을 폐기 여부와 무관하게 모두 지우고 다른 회원의 토큰은 남긴다`() {
+        refreshTokenRepository.save(token(memberId = 1, hash = HASH_A))
+        val rotated = refreshTokenRepository.save(token(memberId = 1, hash = HASH_B))
+        refreshTokenRepository.revoke(rotated.id!!, NOW)
+        refreshTokenRepository.save(token(memberId = 2, hash = HASH_C))
 
-        refreshTokenRepository.revokeAllActive(memberId = 1, now = NOW)
+        val deleted = refreshTokenRepository.deleteAllByMemberId(1)
 
-        assertNotNull(refreshTokenRepository.findByTokenHash(HASH_A)?.revokedAt)
-        assertEquals(saved.id, refreshTokenRepository.findByTokenHash(HASH_A)?.id)
+        assertEquals(2, deleted)
+        assertNull(refreshTokenRepository.findByTokenHash(HASH_A))
+        assertNull(refreshTokenRepository.findByTokenHash(HASH_B))
+        assertNotNull(refreshTokenRepository.findByTokenHash(HASH_C))
     }
 
     private fun token(memberId: Long, hash: String) =
@@ -84,6 +83,5 @@ class JpaRefreshTokenRepositoryTest : StorageTest() {
         private val HASH_A = "a".repeat(64)
         private val HASH_B = "b".repeat(64)
         private val HASH_C = "c".repeat(64)
-        private val HASH_D = "d".repeat(64)
     }
 }

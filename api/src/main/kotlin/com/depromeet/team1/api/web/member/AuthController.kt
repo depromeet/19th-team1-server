@@ -30,14 +30,14 @@ class AuthController(private val authService: AuthService) {
     @Operation(
         summary = "토큰 재발급",
         description = "리프레시 토큰으로 새 액세스·리프레시 토큰을 받는다. 쓴 리프레시 토큰은 폐기된다. " +
-            "쓸 수 없는 토큰(만료·폐기·모름)이면 401 AUTH_INVALID_REFRESH_TOKEN 이고 다시 로그인한다. " +
-            "폐기된 지 30초(설정값)가 지난 토큰을 다시 쓰면 탈취로 보고 그 회원의 리프레시 토큰을 모두 폐기한다.",
+            "쓸 수 없는 토큰(만료·로그아웃·탈취 감지로 지워짐·발급한 적 없음)이면 401 AUTH_INVALID_REFRESH_TOKEN 이고 다시 로그인한다. " +
+            "재발급에 이미 쓴 토큰이 30초(설정값) 안에 다시 오면 새 토큰 쌍을 주고, 지나서 오면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운다.",
     )
     @PostMapping("/reissue")
     fun reissue(@Valid @RequestBody request: RefreshTokenRequest): ApiResponse<TokenResponse> =
         ApiResponse(TokenResponse.from(authService.reissue(request.refreshToken)))
 
-    @Operation(summary = "로그아웃", description = "리프레시 토큰을 폐기한다. 이미 폐기됐거나 모르는 토큰이어도 204 다.")
+    @Operation(summary = "로그아웃", description = "리프레시 토큰을 지운다. 모르는 토큰이어도 204 다.")
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun logout(@Valid @RequestBody request: RefreshTokenRequest) {

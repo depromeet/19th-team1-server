@@ -32,10 +32,14 @@ class FakeRefreshTokenRepository : RefreshTokenRepository {
         return true
     }
 
-    override fun revokeAllActive(memberId: Long, now: Instant): Int {
-        val active = tokens.values.filter { it.memberId == memberId && it.revokedAt == null }
-        active.forEach { tokens[it.id!!] = it.copy(revokedAt = now) }
-        return active.size
+    override fun delete(id: Long) {
+        tokens.remove(id)
+    }
+
+    override fun deleteAllByMemberId(memberId: Long): Int {
+        val ids = tokens.values.filter { it.memberId == memberId }.map { it.id!! }
+        ids.forEach(tokens::remove)
+        return ids.size
     }
 
     /** 테스트 확인용. 회원의 모든 토큰. */

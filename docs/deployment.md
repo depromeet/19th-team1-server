@@ -64,7 +64,7 @@ CI가 `develop`·`main` 푸시에서 이미지를 만들어 GHCR에 올린다. �
 | `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | 앱 | 카카오 로그인 앱의 REST API 키와 클라이언트 시크릿. 셋 중 하나라도 비어 있으면 `dev`·`prod`는 뜨지 않고, `local`은 경고를 남기고 떠서 로그인만 실패한다 |
 | `KAKAO_REDIRECT_URI` | 앱 | 카카오 로그인 리다이렉트 URI. 카카오 개발자 콘솔에 등록한 값과 같아야 한다 |
 | `JWT_SECRET` | 앱 | 액세스 토큰 서명 키(HS256). Base64 로 32바이트 이상. 비어 있으면 `dev`·`prod`는 뜨지 않고, `local`은 임시 키로 뜬다(재시작하면 토큰 무효). 바꾸면 발급한 액세스 토큰이 모두 무효가 된다 |
-| `AUTH_REFRESH_TOKEN_REUSE_GRACE` | 앱(선택) | 폐기된 리프레시 토큰이 이 시간 안에 다시 오면 동시 재발급으로 보고 거절만 한다. 지나서 오면 탈취로 보고 그 회원의 리프레시 토큰을 모두 폐기한다. 기본 `30s` |
+| `AUTH_REFRESH_TOKEN_REUSE_GRACE` | 앱(선택) | 재발급으로 폐기된 리프레시 토큰이 이 시간 안에 다시 오면 동시 재발급으로 보고 새 토큰 쌍을 준다. 지나서 오면 탈취로 보고 그 회원의 리프레시 토큰을 모두 지운다. 기본 `30s` |
 | `SQS_QUEUE_URL` | 서버 | 작업 큐 URL. 로컬 기본값은 ElasticMQ의 `team1-jobs` |
 | `SQS_REGION` | 서버 | 작업 큐 리전. 로컬 기본값은 `ap-southeast-2` |
 | `SQS_ENDPOINT` | 로컬 | SQS 호환 서버 주소. 있으면 그 주소에 자격 증명 없이 붙는다. 서버에서는 비운다 |

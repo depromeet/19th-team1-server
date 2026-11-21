@@ -7,9 +7,12 @@ interface RefreshTokenRepository {
 
     fun findByTokenHash(tokenHash: String): RefreshToken?
 
-    /** 폐기되지 않은 토큰만 폐기한다. 이미 폐기됐으면(동시에 쓰인 경우 포함) 아무것도 바꾸지 않고 false 를 돌려준다. */
+    /** 로테이션으로 폐기한다. 폐기되지 않은 토큰만 폐기하고, 이미 폐기됐으면(동시에 쓰인 경우 포함) 아무것도 바꾸지 않고 false 를 돌려준다. */
     fun revoke(id: Long, now: Instant): Boolean
 
-    /** 회원의 폐기되지 않은 토큰을 모두 폐기하고 폐기한 수를 돌려준다. */
-    fun revokeAllActive(memberId: Long, now: Instant): Int
+    /** 토큰 행을 지운다(로그아웃). 없으면 아무것도 하지 않는다. */
+    fun delete(id: Long)
+
+    /** 회원의 리프레시 토큰 행을 폐기 여부와 무관하게 모두 지우고 지운 수를 돌려준다(탈취 감지). */
+    fun deleteAllByMemberId(memberId: Long): Int
 }

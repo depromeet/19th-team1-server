@@ -665,7 +665,8 @@ stateDiagram-v2
 | `NotificationSender` | 알림 발송 | 채널별 구현. 웹 푸시 구현은 두지 않는다 |
 
 - **LLM 사용량 상한**(`core`의 `LlmUsageGuard`): 호출 전에 검사한다. 사용자별 상한과 전체 상한을 따로 둔다. 상한에 걸린 처리 작업은 재시도하지 않고 실패로 끝낸다(아래 비동기 처리 흐름).
-- **현재 사용자**: 컨트롤러는 "현재 사용자 ID"만 받는다. 해석 방법은 `api`의 한 곳에 둔다. 카카오 로그인이 들어오기 전에는 `local`·`dev`에서만 동작하는 헤더 방식을 쓴다.
+- **현재 사용자**: 컨트롤러는 `@CurrentMemberId memberId: Long`으로 "현재 사용자 ID"만 받는다. 해석은 `api`의 `web/common/CurrentMemberIdArgumentResolver` 한 곳에서 액세스 토큰의 회원 번호(sub)로 한다. 프로필별 헤더 방식은 두지 않는다. `local`도 카카오 로그인으로 토큰을 받는다.
+- **인증**: 웹은 `Authorization: Bearer <액세스 토큰>`으로 요청한다. 검증은 Spring Security Resource Server(`api/config/SecurityConfig`)가 infra 의 `JwtDecoder` 빈으로 한다. `/actuator/health`, Swagger, `POST /api/v1/auth/**`(로그인·재발급·로그아웃)만 토큰 없이 부르고, 인증 API 에서는 Authorization 헤더를 읽지 않는다. 인증 실패는 401 이고, 만료는 `AUTH_TOKEN_EXPIRED`, 없음·위조는 `AUTH_UNAUTHORIZED`다(`web/common/AuthenticationErrorEntryPoint`). 웹은 만료 코드를 받으면 재발급하고, 재발급이 `AUTH_INVALID_REFRESH_TOKEN`이면 재로그인을 안내한다. 폐기된 리프레시 토큰이 다시 오면 거절하고, 폐기된 지 유예 시간(기본 30초, `AUTH_REFRESH_TOKEN_REUSE_GRACE`)이 지났으면 탈취로 보고 그 회원의 리프레시 토큰을 모두 폐기한다. 유예 시간 안이면 동시 재발급으로 보고 거절만 한다.
 - **꺼내기**: 홈 관심사 카드와 채팅 검색이다. 둘 다 저장물 조회와 열람 로그 기록을 공통으로 쓴다. 채팅 검색의 임베딩은 PostgreSQL에 `bytea`로 저장하고 유사도는 앱에서 계산한다.
 - **알림**: 발송 대상 선정과 발송 기록은 채널과 무관하게 서비스가 하고, 채널별 전송만 `NotificationSender` 구현이 한다. 앱 푸시를 더해도 발송 로직은 그대로다.
 

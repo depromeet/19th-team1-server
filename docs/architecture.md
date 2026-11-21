@@ -515,7 +515,7 @@ erDiagram
 | member_credential | (member_id) | 탈퇴 처리 |
 | member_terms_agreement | UNIQUE (member_id, terms_type, terms_version) | 같은 버전 중복 동의 방지, 회원별 조회 |
 | refresh_token | UNIQUE (token_hash) | 재발급·로그아웃 |
-| refresh_token | (member_id) WHERE revoked_at IS NULL | 회원의 살아 있는 토큰 조회. 탈취 감지 삭제는 폐기된 행까지 지워 이 인덱스를 쓰지 못한다(30명 규모라 그대로 둠) |
+| refresh_token | (member_id) | 탈취 감지 때 회원의 토큰을 폐기 여부와 무관하게 모두 삭제 |
 | saved_item | UNIQUE (member_id, normalized_url_hash) WHERE deleted_at IS NULL | 중복 저장 방지. 삭제 후 재저장은 새 행 |
 | saved_item | (member_id, category, created_at DESC, id DESC) WHERE deleted_at IS NULL | 카테고리별 목록, 카테고리별 개수 |
 | saved_item | (member_id, created_at DESC, id DESC) WHERE deleted_at IS NULL | 전체 목록, 처리 중 표시, 홈의 기간 집계 |

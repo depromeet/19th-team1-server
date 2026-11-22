@@ -1,0 +1,133 @@
+name: Doc review
+
+# main 대상 PR 의 변경(git diff)과 레포 문서가 어긋나는 곳을 Codex 가 찾는다. 규칙과 이유: docs/ci.md 5장
+#   - 결과는 실행 요약과 PR 댓글(하나를 고쳐 씀)로 남긴다. 지금은 머지를 막지 않는다(BLOCKING).
+#   - 인증은 Codex 구독 로그인 파일을 시크릿 CODEX_AUTH_JSON 에 둔다. 시크릿이 없거나 로그인이 만료되면 "검사 못 함"으로 통과한다.
+#   - 매일 한 번 시크릿 로그인이 6일 지났는지 본다. 지났으면 실패로 표시해 다시 로그인하게 한다.
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 같은 PR 에 새로 푸시하면 진행 중인 이전 검사를 취소한다. 결과가 쓰이는 것은 마지막 커밋의 검사뿐이다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CODEX_VERSION: "0.166.0"
+
+jobs:
+  # Codex 는 이 잡에서만 돈다. 레포 읽기 권한만 주고, 댓글은 다음 잡이 쓴다.
+  # 외부 포크 PR 에는 시크릿이 넘어오지 않으므로 같은 레포의 PR 에서만 돈다.
+  review:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Codex 가 base 커밋과 비교한다.
+          fetch-depth: 0
+          # Codex 가 GitHub 토큰을 읽지 못하게 git 설정에 남기지 않는다.
+          persist-credentials: false
+
+      - name: Codex 검사
+        env:
+          AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [[ -z "$AUTH_JSON" ]]; then
+            echo "::warning::시크릿 CODEX_AUTH_JSON 이 없어 검사하지 않는다"
+            exit 0
+          fi
+          export CODEX_HOME="$RUNNER_TEMP/codex"
+          install -m 700 -d "$CODEX_HOME"
+          # 어느 단계에서 실패해도 인증 파일을 지운다.
+          trap 'rm -f "$CODEX_HOME/auth.json"' EXIT
+          (umask 077 && printf '%s\n' "$AUTH_JSON" > "$CODEX_HOME/auth.json")
+          # Codex 가 실행하는 셸 명령은 이 단계의 환경변수를 물려받는다. 파일에 쓴 뒤에는 지운다.
+          unset AUTH_JSON
+          printf 'cli_auth_credentials_store = "file"\n' > "$CODEX_HOME/config.toml"
+          # 설치가 실패해도 단계를 실패시키지 않는다. 결과가 없으므로 다음 단계가 "검사 못 함"을 남긴다.
+          npm install -g --silent "@openai/codex@$CODEX_VERSION" \
+            || echo "::warning::Codex 설치가 실패했다"
+          # shellcheck disable=SC2016 # 백틱은 마크다운의 코드 표시라 그대로 출력한다
+          { cat .github/codex/doc-review.md; printf '\n## 검사할 변경\n\n`git diff %s...HEAD`\n' "$BASE"; } > "$RUNNER_TEMP/prompt.md"
+          # 읽기 전용 샌드박스: 파일을 고치거나 네트워크로 내보내지 못한다.
+          codex exec -s read-only --output-schema .github/codex/doc-review.schema.json -o "$RUNNER_TEMP/result.json" - < "$RUNNER_TEMP/prompt.md" \
+            || echo "::warning::Codex 실행이 실패했다"
+
+      # Codex 설치나 실행이 실패해도 "검사 못 함"을 남긴다.
+      - name: 결과
+        if: success() || failure()
+        env:
+          # true 로 바꾸면 어긋남이 있을 때 이 잡이 실패한다. 머지를 막으려면 브랜치 보호의 필수 검사에 review 를 더한다.
+          BLOCKING: "false"
+        # 파이프(| tee)를 쓰지 않는다. shell 을 정하지 않은 단계는 pipefail 없이 돌아 스크립트의 실패가 가려진다.
+        run: |
+          code=0
+          scripts/ci/doc-review-report.sh "$RUNNER_TEMP/result.json" > "$RUNNER_TEMP/report.md" || code=$?
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+          exit "$code"
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: doc-review
+          path: ${{ runner.temp }}/report.md
+          if-no-files-found: ignore
+
+  # PR 에 결과 댓글을 하나만 두고, 다시 검사하면 그 댓글을 고쳐 쓴다.
+  comment:
+    needs: review
+    if: always() && needs.review.result != 'skipped' && needs.review.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: doc-review
+          path: ${{ runner.temp }}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          body="$RUNNER_TEMP/report.md"
+          id=$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- doc-review -->"))) | .id' | tail -1)
+          if [[ -n "$id" ]]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -F "body=@$body" > /dev/null
+          else
+            gh api --method POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" > /dev/null
+          fi
+
+  # 시크릿의 Codex 로그인이 6일 지났으면 실패한다. Codex 는 로그인이 약 8일 지나면 토큰을 갱신하는데, CI 는 갱신된 토큰을 시크릿에 다시 쓸 수 없다.
+  auth-age:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+        run: |
+          if [[ -z "$AUTH_JSON" ]]; then
+            echo "::error::시크릿 CODEX_AUTH_JSON 이 없다"
+            exit 1
+          fi
+          # 토큰은 읽지 않고 마지막 로그인 시각만 본다.
+          if ! days=$(jq -er '.last_refresh | sub("\\.[0-9]+"; "") | fromdateiso8601 | ((now - .) / 86400 | floor)' <<< "$AUTH_JSON"); then
+            echo "::error::시크릿에서 마지막 로그인 시각을 읽지 못했다"
+            exit 1
+          fi
+          echo "Codex 로그인 경과: ${days}일" >> "$GITHUB_STEP_SUMMARY"
+          if ((days >= 6)); then
+            echo "::error::Codex 로그인이 ${days}일 지났다. 다시 로그인해 시크릿 CODEX_AUTH_JSON 을 갱신한다 (docs/ci.md 5장)"
+            exit 1
+          fi

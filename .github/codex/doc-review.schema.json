@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "findings"],
+  "properties": {
+    "status": { "type": "string", "enum": ["pass", "fail"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "doc", "code", "reason"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["error", "question"] },
+          "doc": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "line", "quote"],
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "quote": { "type": "string" }
+            }
+          },
+          "code": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "line", "quote"],
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "quote": { "type": "string" }
+            }
+          },
+          "reason": { "type": "string" }
+        }
+      }
+    }
+  }
+}

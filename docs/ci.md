@@ -1,6 +1,6 @@
 # CI
 
-GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이미지를 GHCR에 올린다. 이 문서는 무엇을 언제 돌리는지와 그렇게 정한 이유를 담는다.
+GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이미지를 GHCR에 올린다. PR 변경과 문서를 비교하는 검사(`.github/workflows/doc-review.yml`)는 5장에 있다. 이 문서는 무엇을 언제 돌리는지와 그렇게 정한 이유를 담는다.
 
 ## 1. 실행 범위
 
@@ -15,7 +15,7 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 - 브랜치 보호의 필수 검사는 CI 워크플로의 `ci-result`와 Convention 워크플로의 `convention`이다. `ci-result`는 CI의 검사 잡(`test`, `docs`) 결과를 모은 잡이다. 검사 잡을 추가하면 이 잡과 `image` 잡의 `needs`에 더한다.
 - 이미지는 검사 잡이 모두 통과해야 올린다. CI가 실패한 커밋은 이미지도 개발 서버 반영도 나가지 않는다.
 - `ci-result`라는 이름은 `main` 대상 PR 실행(전체 테스트)에만 붙는다. 브랜치 푸시 실행은 `ci-result (push)`로 남아 필수 검사가 아니다. 같은 커밋에 두 실행이 같은 이름을 남기면 GitHub이 어느 결과로 머지를 허락할지 문서에 정해져 있지 않기 때문이다.
-- `docs` 잡은 이벤트와 바뀐 파일에 관계없이 항상 돈다. 문서 검사(`scripts/check-docs.sh`)와 Gradle 밖의 스크립트 테스트(`scripts/test-check-docs.sh`, `scripts/claude/test-next-story.sh`, `scripts/ci/test-cleanup-images.sh`)다. PR 본문 검사는 본문을 고칠 때도 다시 돌아야 해서 Convention 워크플로에 있다.
+- `docs` 잡은 이벤트와 바뀐 파일에 관계없이 항상 돈다. 문서 검사(`scripts/check-docs.sh`)와 Gradle 밖의 스크립트 테스트(`scripts/test-check-docs.sh`, `scripts/claude/test-next-story.sh`, `scripts/ci/test-cleanup-images.sh`, `scripts/ci/test-doc-review-report.sh`)다. PR 본문 검사는 본문을 고칠 때도 다시 돌아야 해서 Convention 워크플로에 있다.
 - `develop` 이미지를 올리면 `deploy-dev` 잡이 개발 서버에 반영하고 상태 확인(`/actuator/health`)이 UP인지 본다. 접속 정보와 서버에서 실행하는 명령은 [deployment.md](deployment.md) 7절에 있다.
 - PR이 열린 기능 브랜치에 푸시하면 선택 실행(푸시)과 전체 실행(PR)이 함께 돈다. 선택 실행은 빠른 확인, 전체 실행은 머지 관문이다.
 - 같은 PR이나 기능 브랜치에 새로 푸시하면 진행 중인 이전 실행을 취소한다. `main`·`develop` 푸시는 취소하지 않고 앞 실행이 끝나기를 기다린다. 이미지를 올리거나 개발 서버에 반영하는 도중에 끊기지 않게 하기 위해서다. 기다리는 실행이 여럿이면 GitHub이 가장 최신 것 하나만 남기고 나머지를 취소한다.
@@ -104,6 +104,33 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 
 서버에서 쓰는 방법은 [deployment.md](deployment.md)에 있다.
 
-## 5. 검사를 추가할 자리
+## 5. 문서 정합성 검사 (Codex)
 
-새 검사(예: SDD 스펙과 코드가 맞는지)는 `ci.yml`에 잡으로 추가하고 `ci-result`와 `image`의 `needs`에 더한다. 브랜치 보호 설정은 바꾸지 않아도 된다.
+`main` 대상 PR마다 Codex가 PR 변경(`git diff`)과 레포 문서(`CLAUDE.md`, `.claude/rules/`, `docs/`. `docs/plan/` 제외)를 비교해 어긋난 곳을 찾는다(`.github/workflows/doc-review.yml`). 링크·이슈 번호처럼 기계적으로 볼 수 있는 것은 문서 검사(`scripts/check-docs.sh`)가 하고, 이 검사는 문장이 실제 동작과 맞는지처럼 읽고 판단해야 하는 것을 본다.
+
+- 지적하는 것: 변경 때문에 문서 문장이 틀린 말이 된 곳, 변경이 문서의 규칙을 어긴 곳, 문서가 같이 적으라고 정한 것을 빠뜨린 곳. 지시문은 `.github/codex/doc-review.md`, 결과 형식은 `.github/codex/doc-review.schema.json`이다.
+- 지적마다 문서 쪽과 코드 쪽 줄을 인용한다. 틀린 게 분명하면 "어긋남", 확실하지 않으면 "확인 필요"로 남긴다.
+- 결과는 실행 요약과 PR 댓글로 남긴다. 댓글은 PR마다 하나이고 다시 검사하면 고쳐 쓴다.
+- 머지를 막지 않는다. 결과 단계의 `BLOCKING`이 `"false"`다. `"true"`로 바꾸면 어긋남이 있을 때 `review` 잡이 실패하고, 브랜치 보호의 필수 검사에 `review`를 더하면 머지를 막는다.
+- Codex는 읽기 권한만 가진 `review` 잡에서 읽기 전용 샌드박스로 돈다. 댓글은 다른 잡(`comment`)이 쓴다. diff와 문서에 든 지시문으로 Codex를 조종하려 해도 파일을 고치거나 토큰을 쓸 수 없게 하기 위해서다.
+- 외부 포크 PR에는 시크릿이 넘어오지 않아 돌지 않는다.
+
+**인증**: API 키 대신 Codex 구독 로그인 파일(`auth.json`)을 레포 시크릿 `CODEX_AUTH_JSON`에 둔다. API 키는 사용량만큼 따로 비용이 든다.
+
+- 로그인은 평소 쓰는 로그인과 따로 한다. 같은 로그인을 쓰면 PC의 Codex가 토큰을 갱신할 때 시크릿의 토큰이 무효가 될 수 있다.
+  ```bash
+  mkdir -p ~/.codex-ci
+  printf 'cli_auth_credentials_store = "file"\n' > ~/.codex-ci/config.toml
+  CODEX_HOME=~/.codex-ci codex login
+  jq -c . ~/.codex-ci/auth.json | gh secret set CODEX_AUTH_JSON -R depromeet/19th-team1-server
+  ```
+- 시크릿은 한 줄로 줄여 넣는다(`jq -c`). 여러 줄이면 GitHub이 로그에서 줄마다 가려 `{`, `}` 같은 짧은 줄까지 `***`로 바뀐다.
+- Codex는 로그인이 약 8일 지나면 토큰을 갱신하는데, CI는 갱신된 토큰을 시크릿에 다시 쓸 수 없다. 그래서 매주 위 명령으로 다시 로그인해 시크릿을 바꾼다. 같은 워크플로의 `auth-age` 잡이 매일 한 번 마지막 로그인 시각을 보고, 6일이 지났으면 실패로 표시한다.
+- 시크릿이 없거나 로그인이 만료돼 Codex가 돌지 못하면 "검사 못 함"을 남기고 통과한다. 시크릿 갱신을 놓쳐도 머지가 막히지 않는다.
+- OpenAI는 구독 로그인 파일을 공개 레포의 CI에 쓰지 말라고 안내한다. 레포에 쓰기 권한이 있는 사람은 브랜치에서 워크플로를 고쳐 시크릿을 꺼낼 수 있다. 쓰기 권한이 팀원에게만 있어 받아들였다.
+
+## 6. 검사를 추가할 자리
+
+머지를 막는 새 검사는 `ci.yml`에 잡으로 추가하고 `ci-result`와 `image`의 `needs`에 더한다. 브랜치 보호 설정은 바꾸지 않아도 된다.
+
+결과만 남기고 머지를 막지 않는 검사는 5장의 `Doc review`처럼 별도 워크플로로 두고 `needs`에 넣지 않는다. 검사가 실패하거나 느려도 이미지 빌드가 기다리지 않게 하기 위해서다.

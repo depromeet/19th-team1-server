@@ -149,8 +149,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 | PR을 올리거나 수정할 때: `Convention` 워크플로 | PR 제목, 브랜치 이름, PR에 든 커밋 메시지, PR 본문(`Closes`·`Refs`, 닫는 이슈의 스토리 파일)을 검사한다 | 통과해야 머지할 수 있다 |
 | 기능 브랜치·`develop`에 푸시할 때: `CI` 워크플로 | 바뀐 모듈과 그 모듈에 의존하는 모듈의 테스트, 구조 테스트, 포맷 검사 ([ci.md](ci.md)), 문서 검사 | 머지를 막지 않는다. `develop`은 통과해야 이미지를 올리고 개발 서버에 반영한다 |
 | `main`에 푸시될 때(머지 후): `CI` 워크플로 | `./gradlew ktlintCheck build` (포맷 검사, 전체 테스트), 문서 검사 | 통과해야 이미지를 올린다 |
-| `main` 대상 PR을 올리거나 수정할 때: `CI` 워크플로 | `./gradlew ktlintCheck build` (포맷 검사, 전체 테스트), 문서 검사. 결과는 `ci-result` 검사 하나로 모인다 | 통과해야 머지할 수 있다 |
-| `main` 대상 PR을 올리거나 수정할 때: `Doc review` 워크플로 | Codex가 PR 변경과 문서(`CLAUDE.md`, `.claude/rules/`, `docs/`)가 어긋나는 곳을 찾아 PR 댓글로 남긴다 ([ci.md](ci.md) 5장) | 머지를 막지 않는다 |
+| `main` 대상 PR을 올리거나 새 커밋을 푸시할 때: `CI` 워크플로 | `./gradlew ktlintCheck build` (포맷 검사, 전체 테스트), 문서 검사. 결과는 `ci-result` 검사 하나로 모인다 | 통과해야 머지할 수 있다 |
+| `main` 대상 PR을 올리거나 새 커밋을 푸시할 때: `Doc review` 워크플로 | Codex가 PR 변경과 문서(`CLAUDE.md`, `.claude/rules/`, `docs/`)가 어긋나는 곳을 찾아 PR 댓글로 남긴다 ([ci.md](ci.md) 5장) | 머지를 막지 않는다 |
 | 머지할 때: 브랜치 규칙 | `main`은 PR과 두 검사 통과가 있어야 하고 squash 머지만 허용한다. 직접 푸시, 강제 푸시, 삭제는 막혀 있다 | 불가 |
 
 훅은 레포의 `scripts/git-hooks/`와 ktlint 플러그인이 제공하고, 로컬에서 `./gradlew`로 처음 빌드할 때 `.git/hooks`에 자동으로 설치된다. `Merge`, `Revert`, `fixup!`처럼 git이 만드는 메시지는 검사하지 않는다.

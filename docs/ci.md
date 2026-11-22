@@ -122,12 +122,15 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
   mkdir -p ~/.codex-ci
   printf 'cli_auth_credentials_store = "file"\n' > ~/.codex-ci/config.toml
   CODEX_HOME=~/.codex-ci codex login
-  gh secret set CODEX_AUTH_JSON -R depromeet/19th-team1-server < ~/.codex-ci/auth.json
+  jq -c . ~/.codex-ci/auth.json | gh secret set CODEX_AUTH_JSON -R depromeet/19th-team1-server
   ```
+- 시크릿은 한 줄로 줄여 넣는다(`jq -c`). 여러 줄이면 GitHub이 로그에서 줄마다 가려 `{`, `}` 같은 짧은 줄까지 `***`로 바뀐다.
 - Codex는 로그인이 약 8일 지나면 토큰을 갱신하는데, CI는 갱신된 토큰을 시크릿에 다시 쓸 수 없다. 그래서 매주 위 명령으로 다시 로그인해 시크릿을 바꾼다. 같은 워크플로의 `auth-age` 잡이 매일 한 번 마지막 로그인 시각을 보고, 6일이 지났으면 실패로 표시한다.
 - 시크릿이 없거나 로그인이 만료돼 Codex가 돌지 못하면 "검사 못 함"을 남기고 통과한다. 시크릿 갱신을 놓쳐도 머지가 막히지 않는다.
 - OpenAI는 구독 로그인 파일을 공개 레포의 CI에 쓰지 말라고 안내한다. 레포에 쓰기 권한이 있는 사람은 브랜치에서 워크플로를 고쳐 시크릿을 꺼낼 수 있다. 쓰기 권한이 팀원에게만 있어 받아들였다.
 
 ## 6. 검사를 추가할 자리
 
-새 검사(예: SDD 스펙과 코드가 맞는지)는 `ci.yml`에 잡으로 추가하고 `ci-result`와 `image`의 `needs`에 더한다. 브랜치 보호 설정은 바꾸지 않아도 된다.
+머지를 막는 새 검사는 `ci.yml`에 잡으로 추가하고 `ci-result`와 `image`의 `needs`에 더한다. 브랜치 보호 설정은 바꾸지 않아도 된다.
+
+결과만 남기고 머지를 막지 않는 검사는 5장의 `Doc review`처럼 별도 워크플로로 두고 `needs`에 넣지 않는다. 검사가 실패하거나 느려도 이미지 빌드가 기다리지 않게 하기 위해서다.

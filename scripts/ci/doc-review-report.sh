@@ -42,7 +42,7 @@ fi
 
 echo
 if [[ "$BLOCKING" == "true" ]]; then
-  echo "어긋남이 있으면 머지할 수 없다."
+  echo "어긋남이 있으면 이 검사가 실패한다."
   ((errors == 0)) || exit 1
 else
   echo "결과만 남기고 머지를 막지 않는다."

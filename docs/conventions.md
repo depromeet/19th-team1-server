@@ -138,7 +138,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ## 6. 검사
 
-규칙은 문서로만 두지 않고 자동 검사로 강제한다. 타입·모듈 목록과 형식의 원본은 `scripts/check-convention.sh`이고, 아래 검사가 모두 이 스크립트를 쓴다. 규칙을 바꾸면 스크립트와 이 문서를 같은 PR에서 고친다.
+규칙은 문서로만 두지 않고 자동 검사로 강제한다. 타입·모듈 목록과 형식의 원본은 `scripts/check-convention.sh`이고, 아래 표의 `commit-msg` 훅과 `Convention` 워크플로가 이 스크립트로 검사한다. 규칙을 바꾸면 스크립트와 이 문서를 같은 PR에서 고친다.
 
 | 시점 | 검사 | 우회 가능 여부 |
 | --- | --- | --- |

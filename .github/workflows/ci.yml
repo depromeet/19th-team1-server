@@ -93,6 +93,8 @@ jobs:
         run: scripts/claude/test-next-story.sh
       - name: 이미지 정리 스크립트 테스트
         run: scripts/ci/test-cleanup-images.sh
+      - name: 문서 정합성 결과 스크립트 테스트
+        run: scripts/ci/test-doc-review-report.sh
 
   # 검사 잡(test, docs)이 모두 통과해야 이미지를 올린다. CI 가 실패한 커밋은 이미지도 배포도 나가지 않는다.
   image:

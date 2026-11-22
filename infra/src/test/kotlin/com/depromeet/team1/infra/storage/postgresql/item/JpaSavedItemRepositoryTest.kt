@@ -187,7 +187,7 @@ class JpaSavedItemRepositoryTest : StorageTest() {
     private fun analysisResult(summary: String = "요약") = AnalysisResult(
         title = "제목",
         ogImageUrl = null,
-        platform = Platform.NAVER_BLOG,
+        platform = Platform.BLOG,
         collectLevel = CollectLevel.AUTO,
         category = Category.PLACE,
         categorySource = CategorySource.AI,

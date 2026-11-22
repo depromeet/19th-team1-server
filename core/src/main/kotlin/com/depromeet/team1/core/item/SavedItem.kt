@@ -89,7 +89,7 @@ data class SavedItem(
     }
 }
 
-enum class Platform { YOUTUBE, NAVER_BLOG, INSTAGRAM, X, OTHER }
+enum class Platform { YOUTUBE, BLOG, NOTION, OTHER }
 
 /** 플랫폼별 수집 수준(scope.md "플랫폼별 수집 수준"). */
 enum class CollectLevel { AUTO, PARTIAL, LINK_MEMO }

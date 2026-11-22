@@ -7,7 +7,7 @@ interface LinkContentFetcher {
     fun fetch(url: String): FetchedLink
 }
 
-/** 수집 결과. [title]·[ogImageUrl] 은 저장하고, [author] 는 분석에만 쓴다. */
+/** 수집 결과. [title]·[ogImageUrl] 은 저장하고, [author]·[description]·[body] 는 분석에만 쓴다. */
 data class FetchedLink(
     /** 실제로 내용을 받은 주소. 분석에만 쓰고, 저장물의 주소는 바꾸지 않는다. */
     val finalUrl: String,
@@ -16,6 +16,9 @@ data class FetchedLink(
     val title: String?,
     /** 작성자. 유튜브는 채널 이름이다. */
     val author: String?,
+    val description: String?,
+    /** 본문. 분석에만 쓰고 저장하지 않는다. */
+    val body: String?,
     /** 대표 이미지 주소. 유튜브는 썸네일이다. */
     val ogImageUrl: String?,
     /** 수집 누락. 내용을 다 받았으면 null 이다. 작업을 실패로 끝낼지는 분석이 정한다. */
@@ -26,4 +29,7 @@ data class FetchedLink(
 enum class FetchMiss(val retryable: Boolean) {
     /** 약관이나 봇 차단 때문에 요청하지 않기로 한 곳이다. */
     NOT_REQUESTED(retryable = false),
+
+    /** 로그인이나 권한이 있어야 볼 수 있어 받지 못했다. */
+    BLOCKED(retryable = false),
 }

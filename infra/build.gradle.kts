@@ -20,6 +20,11 @@ dependencies {
     implementation("org.springframework:spring-web")
     implementation("tools.jackson.module:jackson-module-kotlin")
 
+    // 링크 수집기의 웹 페이지 HTML 파싱
+    implementation(libs.jsoup)
+    // 링크 수집기의 웹 페이지 요청. 연결할 IP 를 정하는 DNS 해석기를 바꿔 끼울 수 있다.
+    implementation("org.apache.httpcomponents.client5:httpclient5")
+
     // 액세스 토큰(JWT) 서명·검증. api 의 Resource Server 가 여기서 만든 JwtDecoder 빈으로 검증한다.
     implementation("org.springframework.security:spring-security-oauth2-jose")
 

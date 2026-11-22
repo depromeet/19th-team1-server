@@ -8,10 +8,13 @@ springdoc = "3.2.0"
 okhttp = "5.5.1"
 # AWS SDK 는 Spring Boot BOM 에 없어 자체 BOM 으로 버전을 맞춘다.
 aws-sdk = "2.59.7"
+# Spring Boot BOM 이 jsoup 을 관리하지 않아 버전을 적는다. 링크 수집기가 웹 페이지 HTML 에서 제목·설명·본문을 뽑는 데 쓴다.
+jsoup = "1.24.1"
 
 [libraries]
 aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "aws-sdk" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
 springdoc-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 

@@ -1,6 +1,7 @@
 package com.depromeet.team1.infra.external.link
 
 import com.depromeet.team1.core.item.CollectLevel
+import com.depromeet.team1.core.item.FetchMiss
 import com.depromeet.team1.core.item.FetchedLink
 import com.depromeet.team1.core.item.LinkContentFetcher
 import com.depromeet.team1.core.item.Platform
@@ -24,18 +25,36 @@ class HttpLinkContentFetcher(private val properties: LinkFetchProperties) : Link
         .build()
 
     override fun fetch(url: String): FetchedLink {
+        if (UriComponentsBuilder.fromUriString(url).build().host in NOT_REQUESTED_HOSTS) {
+            return FetchedLink(
+                finalUrl = url,
+                platform = Platform.OTHER,
+                collectLevel = CollectLevel.LINK_MEMO,
+                title = null,
+                author = null,
+                ogImageUrl = null,
+                miss = FetchMiss.NOT_REQUESTED,
+            )
+        }
         val videoId = checkNotNull(youtubeVideoId(url)) { "유튜브 영상 주소가 아니다" }
         val oembed = restClient.get()
             .uri("${properties.youtubeOembedUrl}?url={url}&format=json", "https://www.youtube.com/watch?v=$videoId")
             .retrieve()
             .body(YouTubeOembed::class.java)
         return FetchedLink(
+            finalUrl = url,
             platform = Platform.YOUTUBE,
             collectLevel = CollectLevel.AUTO,
             title = oembed?.title,
             author = oembed?.authorName,
             ogImageUrl = oembed?.thumbnailUrl,
+            miss = null,
         )
+    }
+
+    private companion object {
+        /** 요청하지 않는 곳. 목록은 11/23 회의 결과로 채운다. */
+        val NOT_REQUESTED_HOSTS = setOf("www.musinsa.com")
     }
 }
 

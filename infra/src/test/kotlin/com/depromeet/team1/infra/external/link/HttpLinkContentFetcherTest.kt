@@ -1,6 +1,7 @@
 package com.depromeet.team1.infra.external.link
 
 import com.depromeet.team1.core.item.CollectLevel
+import com.depromeet.team1.core.item.FetchMiss
 import com.depromeet.team1.core.item.Platform
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class HttpLinkContentFetcherTest {
     private val youtube = MockWebServer()
@@ -58,6 +60,20 @@ class HttpLinkContentFetcherTest {
             assertEquals("https://www.youtube.com/watch?v=abc123def45", requested.queryParameter("url"), url)
             assertEquals("json", requested.queryParameter("format"), url)
         }
+    }
+
+    @Test
+    fun `요청하지 않는 곳은 요청 없이 '요청 안 함' 누락과 최종 주소를 돌려준다`() {
+        val url = "https://www.musinsa.com/products/1234567"
+
+        val result = fetcher.fetch(url)
+
+        assertEquals(Platform.OTHER, result.platform)
+        assertEquals(CollectLevel.LINK_MEMO, result.collectLevel)
+        assertEquals(url, result.finalUrl)
+        assertEquals(FetchMiss.NOT_REQUESTED, result.miss)
+        assertFalse(FetchMiss.NOT_REQUESTED.retryable)
+        assertEquals(0, youtube.requestCount)
     }
 
     private fun json(code: Int, body: String): MockResponse = MockResponse.Builder()

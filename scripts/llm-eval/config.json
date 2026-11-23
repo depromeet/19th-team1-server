@@ -163,7 +163,7 @@
         "input": 0.1,
         "output": 0.5
       },
-      "price_source": "Anthropic 모델 표 (claude-api 스킬 캐시 2026-11-03, 입력 10만 토큰 이하 단가). 실행 전 https://platform.claude.com/docs/en/about-claude/pricing 에서 재확인"
+      "price_source": "Anthropic 공식 단가표 2026-11-24 확인 (입력 10만 토큰 이하 단가). https://platform.claude.com/docs/en/about-claude/pricing"
     },
     {
       "id": "claude-sonnet-5-5",
@@ -174,7 +174,7 @@
         "input": 2.0,
         "output": 10.0
       },
-      "price_source": "Anthropic 모델 표 (claude-api 스킬 캐시 2026-11-03). 실행 전 재확인"
+      "price_source": "Anthropic 공식 단가표 2026-11-24 확인"
     },
     {
       "id": "gpt-5.4-nano",
@@ -194,15 +194,21 @@
       "id": "gemini-3.5-flash-lite",
       "provider": "gemini",
       "key_env": "GEMINI_API_KEY",
-      "price_per_mtok": null,
-      "price_source": "미확인. 검색 결과로 본 값은 입력 0.30 / 출력 2.50. https://ai.google.dev/gemini-api/docs/pricing 에서 확인 후 채운다"
+      "price_per_mtok": {
+        "input": 0.3,
+        "output": 2.5
+      },
+      "price_source": "Gemini API 단가표 Standard, 2026-11-21 확인. https://aistudio.google.com/docs/pricing"
     },
     {
       "id": "gemini-3.8-flash",
       "provider": "gemini",
       "key_env": "GEMINI_API_KEY",
-      "price_per_mtok": null,
-      "price_source": "미확인. 2026년 말까지 프로모션 단가(입력 0.75 / 출력 3.75)이고 2027-01-01부터 정가(1.50 / 7.50)라는 자료가 있다. 단가표와 출시 노트가 서로 달라 확인 후 채운다. 비교는 정가로 한다"
+      "price_per_mtok": {
+        "input": 1.5,
+        "output": 7.5
+      },
+      "price_source": "Gemini API 단가표 Standard 정가(2027-01-01부터), 2026-11-21 확인. 2026-12-31까지는 0.75 / 3.75. 비교는 정가로 한다"
     }
   ]
 }

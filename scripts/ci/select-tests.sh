@@ -53,7 +53,7 @@ is_ignored() {
     scripts/check-docs.sh | scripts/test-check-docs.sh | scripts/claude/*) return 0 ;;
     *.md | docs/* | .claude/* | .github/ISSUE_TEMPLATE/* | scripts/git-hooks/*) return 0 ;;
     compose.yaml | .env.example | Dockerfile | .dockerignore | .editorconfig | .gitignore | .gitattributes) return 0 ;;
-    scripts/check-convention.sh) return 0 ;;
+    scripts/check-convention.sh | scripts/llm-eval/*) return 0 ;;
   esac
   return 1
 }

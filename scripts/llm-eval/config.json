@@ -1,0 +1,214 @@
+{
+  "categories_status": "디자인팀 초안(확정 전)",
+  "categories": [
+    {
+      "name": "맛집·장소",
+      "hint": "식당, 카페, 여행지, 전시·팝업 등 가 볼 곳"
+    },
+    {
+      "name": "제품·쇼핑",
+      "hint": "사고 싶은 제품, 상품 페이지"
+    },
+    {
+      "name": "레시피·생활",
+      "hint": "요리, 청소, 정리·수납, 세탁, 수리·관리, 건강·생활 방법"
+    },
+    {
+      "name": "업무·학습",
+      "hint": "방법 습득, 업무 수행, 실습·참고용 실용 자료"
+    },
+    {
+      "name": "콘텐츠·아티클",
+      "hint": "읽거나 보고 끝나는 정보, 시사·트렌드, 견해·이야기 중심 콘텐츠"
+    },
+    {
+      "name": "디자인·아이디어",
+      "hint": "디자인 레퍼런스, 아이디어"
+    },
+    {
+      "name": "쿠폰·티켓·기프티콘",
+      "hint": "쿠폰, 할인·이벤트, 티켓, 기프티콘"
+    },
+    {
+      "name": "기타",
+      "hint": "위 어디에도 맞지 않는 것"
+    }
+  ],
+  "detail_fields": [
+    {
+      "key": "place_name",
+      "label": "장소명",
+      "category": "맛집·장소",
+      "kind": "text"
+    },
+    {
+      "key": "location",
+      "label": "위치",
+      "category": "맛집·장소",
+      "kind": "text"
+    },
+    {
+      "key": "place_type",
+      "label": "장소 유형",
+      "category": "맛집·장소",
+      "kind": "choice",
+      "choices": [
+        "식당",
+        "카페",
+        "관광지",
+        "기타"
+      ]
+    },
+    {
+      "key": "product_name",
+      "label": "제품명",
+      "category": "제품·쇼핑",
+      "kind": "text"
+    },
+    {
+      "key": "product_type",
+      "label": "제품 유형",
+      "category": "제품·쇼핑",
+      "kind": "text"
+    },
+    {
+      "key": "brand",
+      "label": "브랜드명",
+      "category": "제품·쇼핑",
+      "kind": "text"
+    },
+    {
+      "key": "usage_type",
+      "label": "활용 유형",
+      "category": "레시피·생활",
+      "kind": "choice",
+      "choices": [
+        "요리",
+        "청소",
+        "정리·수납",
+        "세탁",
+        "수리·관리",
+        "건강·생활",
+        "기타"
+      ]
+    },
+    {
+      "key": "material_type",
+      "label": "자료 유형",
+      "category": "업무·학습",
+      "kind": "choice",
+      "choices": [
+        "가이드",
+        "템플릿",
+        "강의",
+        "기타"
+      ]
+    },
+    {
+      "key": "content_type",
+      "label": "콘텐츠 유형",
+      "category": "콘텐츠·아티클",
+      "kind": "choice",
+      "choices": [
+        "기사",
+        "영상",
+        "블로그",
+        "기타"
+      ]
+    },
+    {
+      "key": "reference_type",
+      "label": "레퍼런스 유형",
+      "category": "디자인·아이디어",
+      "kind": "choice",
+      "choices": [
+        "UI",
+        "그래픽",
+        "브랜딩",
+        "기타"
+      ]
+    },
+    {
+      "key": "benefit_name",
+      "label": "혜택(이벤트)명",
+      "category": "쿠폰·티켓·기프티콘",
+      "kind": "text"
+    },
+    {
+      "key": "benefit_type",
+      "label": "유형",
+      "category": "쿠폰·티켓·기프티콘",
+      "kind": "choice",
+      "choices": [
+        "쿠폰",
+        "티켓",
+        "기프티콘"
+      ]
+    },
+    {
+      "key": "valid_until",
+      "label": "유효기간",
+      "category": "쿠폰·티켓·기프티콘",
+      "kind": "text"
+    }
+  ],
+  "body_max_chars": 6000,
+  "models": [
+    {
+      "id": "claude-haiku-5-5",
+      "provider": "anthropic",
+      "key_env": "ANTHROPIC_API_KEY",
+      "effort": "low",
+      "price_per_mtok": {
+        "input": 0.1,
+        "output": 0.5
+      },
+      "price_source": "Anthropic 공식 단가표 2026-11-24 확인 (입력 10만 토큰 이하 단가). https://platform.claude.com/docs/en/about-claude/pricing"
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "provider": "anthropic",
+      "key_env": "ANTHROPIC_API_KEY",
+      "effort": "low",
+      "price_per_mtok": {
+        "input": 2.0,
+        "output": 10.0
+      },
+      "price_source": "Anthropic 공식 단가표 2026-11-24 확인"
+    },
+    {
+      "id": "gpt-5.4-nano",
+      "provider": "openai",
+      "key_env": "OPENAI_API_KEY",
+      "price_per_mtok": null,
+      "price_source": "미확인. 검색 결과(2026-11-21)로 본 값은 입력 0.20 / 출력 1.25인데 8개월 전 자료라 https://developers.openai.com/api/docs/pricing 에서 확인 후 채운다. 더 새 모델이 있는지도 확인"
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "provider": "openai",
+      "key_env": "OPENAI_API_KEY",
+      "price_per_mtok": null,
+      "price_source": "미확인. 검색 결과로 본 값은 입력 0.75 / 출력 4.50. 공식 단가표에서 확인 후 채운다"
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "provider": "gemini",
+      "key_env": "GEMINI_API_KEY",
+      "price_per_mtok": {
+        "input": 0.3,
+        "output": 2.5
+      },
+      "price_source": "Gemini API 단가표 Standard, 2026-11-21 확인. https://aistudio.google.com/docs/pricing"
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "provider": "gemini",
+      "key_env": "GEMINI_API_KEY",
+      "price_per_mtok": {
+        "input": 1.5,
+        "output": 7.5
+      },
+      "price_source": "Gemini API 단가표 Standard 정가(2027-01-01부터), 2026-11-21 확인. 2026-12-31까지는 0.75 / 3.75. 비교는 정가로 한다"
+    }
+  ]
+}

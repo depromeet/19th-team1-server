@@ -40,7 +40,7 @@ GitHub Actions(`.github/workflows/ci.yml`)가 테스트를 돌리고 서버 이�
 | `scripts/check-docs.sh`, `scripts/test-check-docs.sh`, `scripts/claude/**` | Gradle 테스트 없음. `docs` 잡이 항상 테스트한다 |
 | 루트 빌드 파일, `gradle/**`, `gradle.properties`, `gradlew*`, `.github/workflows/**`, `scripts/ci/**` | 전체 |
 | 모듈 안의 파일 (코드, 테스트, 리소스, 마이그레이션, 모듈의 `build.gradle.kts`, `.md`를 포함한 모든 파일) | 그 모듈과 그 모듈에 의존하는 모듈 |
-| 모듈 밖의 `*.md`, `docs/**`, `.claude/**`, `.github/ISSUE_TEMPLATE/**`, `compose.yaml`, `.env.example`, `Dockerfile`, `.dockerignore`, `.editorconfig`, `.gitignore`, `.gitattributes`, `scripts/git-hooks/**`, `scripts/check-convention.sh` | 없음 |
+| 모듈 밖의 `*.md`, `docs/**`, `.claude/**`, `.github/ISSUE_TEMPLATE/**`, `compose.yaml`, `.env.example`, `Dockerfile`, `.dockerignore`, `.editorconfig`, `.gitignore`, `.gitattributes`, `scripts/git-hooks/**`, `scripts/check-convention.sh`, `scripts/llm-eval/**` | 없음 |
 | 그 밖에 모듈 밖의 파일 | 전체 |
 
 지금 모듈 의존은 `core ← infra, worker ← api`다. 그래서 `core`가 바뀌면 모든 모듈, `infra`·`worker`가 바뀌면 그 모듈과 `api`, `api`가 바뀌면 `api`만 돈다.

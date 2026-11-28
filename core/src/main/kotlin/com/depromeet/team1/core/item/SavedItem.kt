@@ -91,7 +91,7 @@ data class SavedItem(
 
 enum class Platform { YOUTUBE, BLOG, NOTION, OTHER }
 
-/** 플랫폼별 수집 수준(scope.md "플랫폼별 수집 수준"). */
+/** 링크에서 얼마나 받는지(scope.md "플랫폼별 수집 수준"). 플랫폼이 아니라 수집 경로로 정해서, 같은 플랫폼도 주소에 따라 다르다. */
 enum class CollectLevel { AUTO, PARTIAL, LINK_MEMO }
 
 /** 화면에 보이는 처리 상태. 최초 처리와 재시도만 반영한다. */

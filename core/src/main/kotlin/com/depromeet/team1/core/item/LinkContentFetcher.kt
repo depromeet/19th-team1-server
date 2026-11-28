@@ -9,7 +9,7 @@ interface LinkContentFetcher {
 
 /** 수집 결과. [title]·[ogImageUrl] 은 저장하고, [author]·[description]·[body] 는 분석에만 쓴다. */
 data class FetchedLink(
-    /** 실제로 내용을 받은 주소. 분석에만 쓰고, 저장물의 주소는 바꾸지 않는다. */
+    /** 수집에 쓴 주소. 네이버 블로그는 바꾼 모바일 주소이고, 나머지는 받은 주소 그대로다. 내용을 못 받아도 들어간다. 분석에만 쓰고, 저장물의 주소는 바꾸지 않는다. */
     val finalUrl: String,
     val platform: Platform,
     val collectLevel: CollectLevel,
@@ -27,7 +27,7 @@ data class FetchedLink(
 
 /** 수집이 내용을 받지 못한 이유. [retryable] 은 다시 해 볼 만한지다. */
 enum class FetchMiss(val retryable: Boolean) {
-    /** 약관이나 봇 차단 때문에 요청하지 않기로 한 곳이다. */
+    /** 약관이나 봇 차단 때문에 요청하지 않기로 한 곳이거나, 요청하지 않는 주소 형태(영상이 아닌 유튜브 주소 등)다. */
     NOT_REQUESTED(retryable = false),
 
     /** 로그인이나 권한이 있어야 볼 수 있어 받지 못했다. */

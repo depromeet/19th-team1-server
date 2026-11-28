@@ -8,7 +8,7 @@ springdoc = "3.2.0"
 okhttp = "5.5.1"
 # AWS SDK 는 Spring Boot BOM 에 없어 자체 BOM 으로 버전을 맞춘다.
 aws-sdk = "2.59.7"
-# Spring Boot BOM 이 jsoup 을 관리하지 않아 버전을 적는다. 링크 수집기가 웹 페이지 HTML 에서 제목·설명·본문을 뽑는 데 쓴다.
+# Spring Boot BOM 이 jsoup 을 관리하지 않아 버전을 적는다. 링크 수집기가 웹 페이지 HTML 에서 제목·설명·본문·작성자·대표 이미지와 JSON-LD 를 뽑는 데 쓴다.
 jsoup = "1.24.1"
 
 [libraries]

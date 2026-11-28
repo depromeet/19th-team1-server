@@ -7,7 +7,7 @@
 | 모듈 | 두는 것 | 코드에서 의존할 수 있는 것 |
 | --- | --- | --- |
 | `core` | 도메인 모델, 서비스, 경계 인터페이스, 에러 코드, 조회 모델 | 없음. Spring은 `@Service`, `@Transactional`까지 |
-| `infra` | 경계 인터페이스의 구현. `storage/postgresql`(DB), `external`(LLM·푸시·파일·소셜 로그인), `security`(토큰 서명·검증) | `core` |
+| `infra` | 경계 인터페이스의 구현. `storage/postgresql`(DB), `external`(LLM·푸시·파일·소셜 로그인·링크 수집), `security`(토큰 서명·검증) | `core` |
 | `api` | 컨트롤러, 요청·응답 DTO, 예외 변환, 설정, 실행 클래스 | `core` (`infra`·`worker`는 실행 시에만 포함) |
 | `worker` | 작업 큐 수신(`job/`), 예약 작업(`schedule/`) | `core` |
 

@@ -75,7 +75,7 @@ flowchart TB
 | 모듈 | 역할 | 의존 가능 대상 | 쓸 수 있는 기술 |
 | --- | --- | --- | --- |
 | `core` | 도메인 모델, 서비스, 경계 인터페이스 | 없음 | Spring의 DI·트랜잭션 어노테이션까지. JPA, 웹, HTTP 클라이언트, LLM SDK 금지 |
-| `infra` | 경계 인터페이스의 구현. DB(`storage`), 외부 연동(`external`), 토큰 서명·검증(`security`)을 패키지로 나눈다 | `core` | JPA, PostgreSQL 드라이버, Flyway, HTTP 클라이언트, LLM SDK, AWS SDK(SQS), 푸시 SDK, Spring Security JOSE(JWT) |
+| `infra` | 경계 인터페이스의 구현. DB(`storage`), 외부 연동(`external`), 토큰 서명·검증(`security`)을 패키지로 나눈다 | `core` | JPA, PostgreSQL 드라이버, Flyway, HTTP 클라이언트, HTML 파서(jsoup), LLM SDK, AWS SDK(SQS), 푸시 SDK, Spring Security JOSE(JWT) |
 | `api` | 요청으로 시작하는 진입점(컨트롤러)과 설정. 실행 모듈 | `core` (코드에서), `infra`·`worker` (실행 시 조립만) | Spring MVC, springdoc, actuator |
 | `worker` | 요청 없이 도는 진입점(작업 큐 수신, 스케줄러) | `core` | Spring의 스케줄링 |
 
@@ -408,9 +408,9 @@ erDiagram
 | original_url | text | N | 사용자가 넣은 그대로. 링크를 열 때 씀 |
 | normalized_url | text | N | 외부 호출 없는 문자열 변환(추적 파라미터 제거, 네이버 블로그 주소 변환 등)만 거친 값. 저장 요청 안에서 만들고 이후 바꾸지 않음 |
 | normalized_url_hash | varchar(64) | N | normalized_url의 SHA-256. 중복 판정 인덱스용 |
-| platform | varchar(30) | N | `YOUTUBE`, `NAVER_BLOG`, `INSTAGRAM`, `X` 등. 저장 때 URL 문자열로 판별, 모르면 `OTHER`. 단축 링크는 워커가 최종 주소를 보고 고침 |
-| collect_level | varchar(20) | N | `AUTO`, `PARTIAL`, `LINK_MEMO`(`scope.md` 수집 수준). platform을 고치면 함께 고침 |
-| memo | varchar(200) | Y | 사용자 한 줄 메모. LINK_MEMO 플랫폼에서 분류 재료 |
+| platform | varchar(30) | N | `YOUTUBE`, `BLOG`(블로그 전체), `NOTION`, `OTHER`. 저장 때 URL 문자열로 판별, 모르면 `OTHER`. 워커가 수집한 최종 주소와 페이지의 블로그 표시(JSON-LD)를 보고 고침 |
+| collect_level | varchar(20) | N | `AUTO`, `PARTIAL`, `LINK_MEMO`(`scope.md` 수집 수준). 플랫폼이 아니라 수집 경로로 정해서, 같은 platform도 주소에 따라 다름(유튜브 영상은 AUTO, 채널은 LINK_MEMO). 단축 링크를 풀면 함께 고침 |
+| memo | varchar(200) | Y | 사용자 한 줄 메모. 수집 수준이 LINK_MEMO인 저장물에서 분류 재료 |
 | title | varchar(500) | Y | 수집 단계에서 먼저 채움. 처리 중에도 화면에 표시 |
 | og_image_url | varchar(2048) | Y | 원본 대표 이미지 주소. 파일은 복사하지 않음 |
 | process_status | varchar(20) | N | 화면용 `PENDING`, `PROCESSING`, `DONE`, `FAILED`. 최초 처리·재시도만 반영 |

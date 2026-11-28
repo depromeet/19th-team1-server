@@ -408,7 +408,7 @@ erDiagram
 | original_url | text | N | 사용자가 넣은 그대로. 링크를 열 때 씀 |
 | normalized_url | text | N | 외부 호출 없는 문자열 변환(추적 파라미터 제거, 네이버 블로그 주소 변환 등)만 거친 값. 저장 요청 안에서 만들고 이후 바꾸지 않음 |
 | normalized_url_hash | varchar(64) | N | normalized_url의 SHA-256. 중복 판정 인덱스용 |
-| platform | varchar(30) | N | `YOUTUBE`, `BLOG`(블로그 전체), `NOTION`, `OTHER`. 저장 때 URL 문자열로 판별, 모르면 `OTHER`. 단축 링크는 워커가 최종 주소를 보고 고침 |
+| platform | varchar(30) | N | `YOUTUBE`, `BLOG`(블로그 전체), `NOTION`, `OTHER`. 저장 때 URL 문자열로 판별, 모르면 `OTHER`. 워커가 수집한 최종 주소와 페이지의 블로그 표시(JSON-LD)를 보고 고침 |
 | collect_level | varchar(20) | N | `AUTO`, `PARTIAL`, `LINK_MEMO`(`scope.md` 수집 수준). 플랫폼이 아니라 수집 경로로 정해서, 같은 platform도 주소에 따라 다름(유튜브 영상은 AUTO, 채널은 LINK_MEMO). 단축 링크를 풀면 함께 고침 |
 | memo | varchar(200) | Y | 사용자 한 줄 메모. 수집 수준이 LINK_MEMO인 저장물에서 분류 재료 |
 | title | varchar(500) | Y | 수집 단계에서 먼저 채움. 처리 중에도 화면에 표시 |

@@ -2,6 +2,7 @@ package com.depromeet.team1.core.item
 
 /**
  * 링크에서 분석 재료를 받아 온다. 구현은 infra 의 `external/link` 에 둔다(`docs/architecture.md` 경계 인터페이스).
+ * 외부 오류(시간 초과, 오류 응답, 호출 한도 초과)는 [LinkError] 로 된 `AppException` 을 던진다. 받지 않기로 한 경우는 [FetchedLink.miss] 로 돌려준다.
  */
 interface LinkContentFetcher {
     fun fetch(url: String): FetchedLink
@@ -30,6 +31,6 @@ enum class FetchMiss {
     /** 약관이나 봇 차단 때문에 요청하지 않기로 한 곳이거나, 요청하지 않는 주소 형태(영상이 아닌 유튜브 주소 등)다. */
     NOT_REQUESTED,
 
-    /** 로그인이나 권한이 있어야 볼 수 있어 받지 못했다. */
+    /** 비공개 페이지라 받지 못했다. 지금은 노션의 404만 이렇게 본다. 권한 오류 응답(401·403)은 [LinkError.LINK_BLOCKED] 예외다. */
     BLOCKED,
 }

@@ -1,7 +1,9 @@
 package com.depromeet.team1.infra.external.link
 
+import com.depromeet.team1.core.common.error.AppException
 import com.depromeet.team1.core.item.CollectLevel
 import com.depromeet.team1.core.item.FetchMiss
+import com.depromeet.team1.core.item.LinkError
 import com.depromeet.team1.core.item.Platform
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -11,9 +13,12 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.net.InetAddress
+import java.net.ServerSocket
 import java.nio.charset.Charset
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -99,6 +104,41 @@ class HttpLinkContentFetcherTest {
             assertEquals(FetchMiss.NOT_REQUESTED, result.miss, url)
         }
         assertEquals(0, youtube.requestCount)
+    }
+
+    @Test
+    fun `유튜브 oEmbed 오류 응답도 웹 페이지와 같은 예외로 바꾼다`() {
+        val expected = mapOf(
+            404 to LinkError.LINK_NOT_FOUND,
+            401 to LinkError.LINK_BLOCKED,
+            403 to LinkError.LINK_BLOCKED,
+            429 to LinkError.LINK_RATE_LIMITED,
+            500 to LinkError.LINK_UNAVAILABLE,
+        )
+
+        for ((code, error) in expected) {
+            youtube.enqueue(json(code, "{}"))
+
+            val thrown = assertFailsWith<AppException>("$code") { fetcher.fetch("https://youtu.be/abc123def45") }
+
+            assertEquals(error, thrown.errorCode, "$code")
+        }
+    }
+
+    @Test
+    fun `유튜브 oEmbed가 제때 응답하지 않으면 '받을 수 없음' 예외를 던진다`() {
+        val quickFetcher = HttpLinkContentFetcher(
+            LinkFetchProperties(
+                youtubeOembedUrl = youtube.url("/oembed").toString(),
+                readTimeout = Duration.ofMillis(200),
+            ),
+            dnsResolver = AllHostsToLoopback,
+        )
+        youtube.enqueue(json(200, OEMBED_BODY).newBuilder().headersDelay(2, TimeUnit.SECONDS).build())
+
+        val thrown = assertFailsWith<AppException> { quickFetcher.fetch("https://youtu.be/abc123def45") }
+
+        assertEquals(LinkError.LINK_UNAVAILABLE, thrown.errorCode)
     }
 
     @Test
@@ -412,6 +452,67 @@ class HttpLinkContentFetcherTest {
         val result = fetcher.fetch(web.url("/post/8").toString())
 
         assertNull(result.body)
+    }
+
+    @Test
+    fun `웹 페이지가 404·410이면 '없는 링크' 예외를 던진다`() {
+        for (code in listOf(404, 410)) {
+            web.enqueue(html(code, "<html></html>"))
+
+            val error = assertFailsWith<AppException>("$code") { fetcher.fetch(web.url("/gone/$code").toString()) }
+
+            assertEquals(LinkError.LINK_NOT_FOUND, error.errorCode, "$code")
+        }
+    }
+
+    @Test
+    fun `웹 페이지가 401·403이나 그 밖의 4xx면 '막힌 링크' 예외를 던진다`() {
+        for (code in listOf(401, 403, 400, 405, 451)) {
+            web.enqueue(html(code, "<html></html>"))
+
+            val error = assertFailsWith<AppException>("$code") { fetcher.fetch(web.url("/blocked/$code").toString()) }
+
+            assertEquals(LinkError.LINK_BLOCKED, error.errorCode, "$code")
+        }
+    }
+
+    @Test
+    fun `웹 페이지가 429면 '호출 한도' 예외를 던진다`() {
+        web.enqueue(html(429, "<html></html>"))
+
+        val error = assertFailsWith<AppException> { fetcher.fetch(web.url("/busy").toString()) }
+
+        assertEquals(LinkError.LINK_RATE_LIMITED, error.errorCode)
+    }
+
+    @Test
+    fun `웹 페이지가 5xx면 '받을 수 없음' 예외를 던진다`() {
+        for (code in listOf(500, 502, 503)) {
+            web.enqueue(html(code, "<html></html>"))
+
+            val error = assertFailsWith<AppException>("$code") { fetcher.fetch(web.url("/down/$code").toString()) }
+
+            assertEquals(LinkError.LINK_UNAVAILABLE, error.errorCode, "$code")
+        }
+    }
+
+    @Test
+    fun `웹 페이지가 제때 응답하지 않거나 연결되지 않으면 '받을 수 없음' 예외를 던진다`() {
+        val quickFetcher = HttpLinkContentFetcher(
+            LinkFetchProperties(
+                youtubeOembedUrl = youtube.url("/oembed").toString(),
+                readTimeout = Duration.ofMillis(200),
+            ),
+            dnsResolver = AllHostsToLoopback,
+        )
+        web.enqueue(html(200, ARTICLE_HTML).newBuilder().headersDelay(2, TimeUnit.SECONDS).build())
+        val closedPort = ServerSocket(0).use { it.localPort }
+
+        val slow = assertFailsWith<AppException> { quickFetcher.fetch(web.url("/slow").toString()) }
+        val refused = assertFailsWith<AppException> { quickFetcher.fetch("http://closed.example:$closedPort/post") }
+
+        assertEquals(LinkError.LINK_UNAVAILABLE, slow.errorCode)
+        assertEquals(LinkError.LINK_UNAVAILABLE, refused.errorCode)
     }
 
     @Test

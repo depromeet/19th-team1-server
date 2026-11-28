@@ -1,9 +1,11 @@
 package com.depromeet.team1.infra.external.link
 
+import com.depromeet.team1.core.common.error.AppException
 import com.depromeet.team1.core.item.CollectLevel
 import com.depromeet.team1.core.item.FetchMiss
 import com.depromeet.team1.core.item.FetchedLink
 import com.depromeet.team1.core.item.LinkContentFetcher
+import com.depromeet.team1.core.item.LinkError
 import com.depromeet.team1.core.item.Platform
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -16,11 +18,14 @@ import org.apache.hc.core5.util.Timeout
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.http.HttpStatusCode
 import org.springframework.http.InvalidMediaTypeException
 import org.springframework.http.MediaType
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.springframework.http.client.JdkClientHttpRequestFactory
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
 import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.util.UriComponents
 import org.springframework.web.util.UriComponentsBuilder
@@ -95,10 +100,12 @@ class HttpLinkContentFetcher(
     }
 
     private fun fetchYouTubeVideo(url: String, videoId: String): FetchedLink {
-        val oembed = oembedClient.get()
-            .uri("${properties.youtubeOembedUrl}?url={url}&format=json", "https://www.youtube.com/watch?v=$videoId")
-            .retrieve()
-            .body(YouTubeOembed::class.java)
+        val oembed = call {
+            oembedClient.get()
+                .uri("${properties.youtubeOembedUrl}?url={url}&format=json", "https://www.youtube.com/watch?v=$videoId")
+                .retrieve()
+                .body(YouTubeOembed::class.java)
+        }
         return FetchedLink(
             finalUrl = url,
             platform = Platform.YOUTUBE,
@@ -112,21 +119,30 @@ class HttpLinkContentFetcher(
         )
     }
 
+    /**
+     * 요청의 외부 오류를 내부 예외로 바꾼다. 호출 한도 초과(429)는 다른 오류와 구분한다.
+     * 원인 예외는 붙이지 않는다. 원인의 메시지에 요청 주소가 들어 있어 에러 로그에 그대로 찍히기 때문이다.
+     */
+    private fun <T> call(block: () -> T): T = try {
+        block()
+    } catch (e: RestClientResponseException) {
+        throw AppException(e.statusCode.toLinkError() ?: LinkError.LINK_UNAVAILABLE, "status=${e.statusCode.value()}")
+    } catch (e: RestClientException) {
+        throw AppException(LinkError.LINK_UNAVAILABLE, e.javaClass.simpleName)
+    }
+
     private fun fetchWebPage(url: String, platform: Platform): FetchedLink {
         // 응답 변환기를 거치지 않고 바이트로 받는다. 변환기는 Content-Type 의 모르는 charset 에서 예외를 던진다.
-        val page = webClient.get().uri(URI.create(url)).exchange { _, response ->
-            when {
-                // 노션은 봇 UA 로 요청한 비공개 페이지에 404 를 준다. 없는 페이지와 구분되지 않아 둘 다 비공개로 본다.
-                platform == Platform.NOTION && response.statusCode.value() == 404 -> null
-                response.statusCode.isError -> throw RestClientResponseException(
-                    "링크 응답 오류",
-                    response.statusCode,
-                    response.statusText,
-                    null,
-                    null,
-                    null,
-                )
-                else -> RawPage(response.headers.getFirst(HttpHeaders.CONTENT_TYPE), response.body.readAllBytes())
+        val page = call {
+            webClient.get().uri(URI.create(url)).exchange { _, response ->
+                when {
+                    // 노션은 봇 UA 로 요청한 비공개 페이지에 404 를 준다. 없는 페이지와 구분되지 않아 둘 다 비공개로 본다.
+                    platform == Platform.NOTION && response.statusCode.value() == 404 -> null
+                    else -> response.statusCode.toLinkError()?.let {
+                        throw AppException(it, "status=${response.statusCode.value()}")
+                    }
+                        ?: RawPage(response.headers.getFirst(HttpHeaders.CONTENT_TYPE), response.body.readAllBytes())
+                }
             }
         } ?: return privateNotion(url)
         val document = Jsoup.parse(ByteArrayInputStream(page.body), page.charset(), url)
@@ -176,6 +192,18 @@ class HttpLinkContentFetcher(
         /** 유튜브. 도메인과 그 하위 도메인, 그리고 단축 주소 호스트(`youtu.be`)가 YOUTUBE 다. */
         val YOUTUBE_DOMAINS = setOf("youtube.com", "youtube-nocookie.com")
     }
+}
+
+/** 없는 글로 보는 응답 상태. */
+private val NOT_FOUND_STATUSES = setOf(404, 410)
+
+/** 오류 응답 상태를 링크 오류로 바꾼다. 오류가 아니면 null 이다. 4xx 는 다시 해도 소용없고, 429 와 5xx 는 다시 하면 될 수 있다. */
+private fun HttpStatusCode.toLinkError(): LinkError? = when {
+    value() in NOT_FOUND_STATUSES -> LinkError.LINK_NOT_FOUND
+    value() == HttpStatus.TOO_MANY_REQUESTS.value() -> LinkError.LINK_RATE_LIMITED
+    is4xxClientError -> LinkError.LINK_BLOCKED
+    isError -> LinkError.LINK_UNAVAILABLE
+    else -> null
 }
 
 /** 호스트가 [domains] 의 도메인이거나 그 하위 도메인인지. */

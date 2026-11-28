@@ -25,11 +25,11 @@ data class FetchedLink(
     val miss: FetchMiss?,
 )
 
-/** 수집이 내용을 받지 못한 이유. [retryable] 은 다시 해 볼 만한지다. */
-enum class FetchMiss(val retryable: Boolean) {
+/** 수집이 내용을 받지 못한 이유. */
+enum class FetchMiss {
     /** 약관이나 봇 차단 때문에 요청하지 않기로 한 곳이거나, 요청하지 않는 주소 형태(영상이 아닌 유튜브 주소 등)다. */
-    NOT_REQUESTED(retryable = false),
+    NOT_REQUESTED,
 
     /** 로그인이나 권한이 있어야 볼 수 있어 받지 못했다. */
-    BLOCKED(retryable = false),
+    BLOCKED,
 }
